@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenancy;
 
-use App\Models\Tenancy\Domain;
 use App\Models\Tenancy\Tenant;
 use App\Services\TenantService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 final class TenantCreationTest extends TestCase
@@ -25,6 +26,21 @@ final class TenantCreationTest extends TestCase
 
         // Run migrations on landlord database
         $this->artisan('migrate:fresh')->assertExitCode(0);
+    }
+
+    protected function tearDown(): void
+    {
+        // Clean up any tenant databases created during tests
+        $tenants = Tenant::all();
+        foreach ($tenants as $tenant) {
+            try {
+                $this->tenantService->deleteTenant($tenant);
+            } catch (Exception $e) {
+                // Ignore errors during cleanup
+            }
+        }
+
+        parent::tearDown();
     }
 
     public function test_can_create_tenant_with_subdomain(): void
@@ -79,7 +95,7 @@ final class TenantCreationTest extends TestCase
         $dbName = "tenant{$tenant->id}";
 
         // Query to check if database exists
-        $exists = DB::selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+        $exists = DB::selectOne('SELECT 1 FROM pg_database WHERE datname = ?', [$dbName]);
 
         $this->assertNotNull($exists, "Tenant database {$dbName} should exist");
     }
@@ -116,7 +132,7 @@ final class TenantCreationTest extends TestCase
         ]);
 
         // Attempt to create second tenant with same subdomain
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('This subdomain is already taken');
 
         $this->tenantService->createTenant([
@@ -129,7 +145,7 @@ final class TenantCreationTest extends TestCase
 
     public function test_cannot_create_tenant_with_reserved_subdomain(): void
     {
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('This subdomain is reserved');
 
         $this->tenantService->createTenant([
@@ -142,7 +158,7 @@ final class TenantCreationTest extends TestCase
 
     public function test_cannot_create_tenant_with_invalid_subdomain_format(): void
     {
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Subdomain must contain only lowercase letters');
 
         $this->tenantService->createTenant([
@@ -174,7 +190,7 @@ final class TenantCreationTest extends TestCase
         $this->assertDatabaseMissing('domains', ['tenant_id' => $tenantId]);
 
         // Check database is deleted
-        $exists = DB::selectOne("SELECT 1 FROM pg_database WHERE datname = ?", [$dbName]);
+        $exists = DB::selectOne('SELECT 1 FROM pg_database WHERE datname = ?', [$dbName]);
         $this->assertNull($exists, "Tenant database {$dbName} should be deleted");
     }
 
@@ -234,20 +250,5 @@ final class TenantCreationTest extends TestCase
 
         $this->assertFalse($this->tenantService->isSubdomainAvailable('taken'));
         $this->assertFalse($this->tenantService->isSubdomainAvailable('admin')); // Reserved
-    }
-
-    protected function tearDown(): void
-    {
-        // Clean up any tenant databases created during tests
-        $tenants = Tenant::all();
-        foreach ($tenants as $tenant) {
-            try {
-                $this->tenantService->deleteTenant($tenant);
-            } catch (\Exception $e) {
-                // Ignore errors during cleanup
-            }
-        }
-
-        parent::tearDown();
     }
 }

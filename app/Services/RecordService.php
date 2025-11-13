@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleRecordModel;
+use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -20,6 +21,7 @@ final class RecordService
      * Create a new record for a module.
      *
      * @param  array<string, mixed>  $data  Field values keyed by api_name
+     *
      * @throws RuntimeException If record creation fails
      */
     public function createRecord(int $moduleId, array $data, ?int $createdBy = null): ModuleRecordModel
@@ -47,7 +49,7 @@ final class RecordService
             DB::commit();
 
             return $record->fresh(['module', 'creator', 'updater']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create record: {$e->getMessage()}", 0, $e);
         }
@@ -57,6 +59,7 @@ final class RecordService
      * Update an existing record.
      *
      * @param  array<string, mixed>  $data  Field values keyed by api_name
+     *
      * @throws RuntimeException If record update fails
      */
     public function updateRecord(int $recordId, array $data, ?int $updatedBy = null): ModuleRecordModel
@@ -82,7 +85,7 @@ final class RecordService
             DB::commit();
 
             return $record->fresh(['module', 'creator', 'updater']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update record: {$e->getMessage()}", 0, $e);
         }
@@ -102,7 +105,7 @@ final class RecordService
             $record->delete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete record: {$e->getMessage()}", 0, $e);
         }
@@ -124,7 +127,7 @@ final class RecordService
             DB::commit();
 
             return $record->fresh(['module', 'creator', 'updater']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to restore record: {$e->getMessage()}", 0, $e);
         }
@@ -144,7 +147,7 @@ final class RecordService
             $record->forceDelete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to permanently delete record: {$e->getMessage()}", 0, $e);
         }
@@ -177,14 +180,14 @@ final class RecordService
             $search = $options['search'];
             $query->where(function ($q) use ($search) {
                 // Search in JSON data using PostgreSQL operators
-                $q->whereRaw("data::text ILIKE ?", ["%{$search}%"]);
+                $q->whereRaw('data::text ILIKE ?', ["%{$search}%"]);
             });
         }
 
         // Apply filters if provided
         if (! empty($options['filters'])) {
             foreach ($options['filters'] as $field => $value) {
-                $query->whereRaw("data->? = ?", [$field, json_encode($value)]);
+                $query->whereRaw('data->? = ?', [$field, json_encode($value)]);
             }
         }
 
@@ -218,12 +221,12 @@ final class RecordService
 
         if (empty($searchableFields)) {
             // Search all fields
-            $query->whereRaw("data::text ILIKE ?", ["%{$searchTerm}%"]);
+            $query->whereRaw('data::text ILIKE ?', ["%{$searchTerm}%"]);
         } else {
             // Search specific fields
             $query->where(function ($q) use ($searchableFields, $searchTerm) {
                 foreach ($searchableFields as $field) {
-                    $q->orWhereRaw("data->>? ILIKE ?", [$field, "%{$searchTerm}%"]);
+                    $q->orWhereRaw('data->>? ILIKE ?', [$field, "%{$searchTerm}%"]);
                 }
             });
         }
@@ -241,7 +244,7 @@ final class RecordService
         int $perPage = 15
     ): LengthAwarePaginator {
         return ModuleRecordModel::where('module_id', $moduleId)
-            ->whereRaw("data->? = ?", [$fieldApiName, json_encode($value)])
+            ->whereRaw('data->? = ?', [$fieldApiName, json_encode($value)])
             ->with(['creator', 'updater'])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
@@ -261,7 +264,7 @@ final class RecordService
     public function getRecordCountByField(int $moduleId, string $fieldApiName, mixed $value): int
     {
         return ModuleRecordModel::where('module_id', $moduleId)
-            ->whereRaw("data->? = ?", [$fieldApiName, json_encode($value)])
+            ->whereRaw('data->? = ?', [$fieldApiName, json_encode($value)])
             ->count();
     }
 
@@ -270,6 +273,7 @@ final class RecordService
      *
      * @param  array<array<string, mixed>>  $records  Array of record data
      * @return array<ModuleRecordModel>
+     *
      * @throws RuntimeException If bulk creation fails
      */
     public function bulkCreateRecords(int $moduleId, array $records, ?int $createdBy = null): array
@@ -301,7 +305,7 @@ final class RecordService
             DB::commit();
 
             return $createdRecords;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to bulk create records: {$e->getMessage()}", 0, $e);
         }
@@ -311,6 +315,7 @@ final class RecordService
      * Bulk delete records.
      *
      * @param  array<int>  $recordIds
+     *
      * @throws RuntimeException If bulk deletion fails
      */
     public function bulkDeleteRecords(array $recordIds): int
@@ -323,7 +328,7 @@ final class RecordService
             DB::commit();
 
             return $deleted;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to bulk delete records: {$e->getMessage()}", 0, $e);
         }
@@ -334,6 +339,7 @@ final class RecordService
      *
      * @param  array<int>  $recordIds
      * @param  array<string, mixed>  $data
+     *
      * @throws RuntimeException If bulk update fails
      */
     public function bulkUpdateRecords(int $moduleId, array $recordIds, array $data, ?int $updatedBy = null): int
@@ -365,48 +371,10 @@ final class RecordService
             DB::commit();
 
             return $records->count();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to bulk update records: {$e->getMessage()}", 0, $e);
         }
-    }
-
-    /**
-     * Validate and transform data according to module field definitions.
-     *
-     * @param  array<string, mixed>  $data  New data
-     * @param  array<string, mixed>  $existingData  Existing data (for updates)
-     * @return array<string, mixed>
-     */
-    private function validateAndTransformData(ModuleModel $module, array $data, array $existingData = []): array
-    {
-        $validatedData = $existingData;
-
-        // Get all fields from all blocks
-        foreach ($module->blocks as $block) {
-            foreach ($block->fields as $field) {
-                $apiName = $field->api_name;
-
-                // If field is present in data, validate it
-                if (array_key_exists($apiName, $data)) {
-                    $value = $data[$apiName];
-
-                    // Validate field value
-                    $this->fieldService->validateFieldValue($field, $value);
-
-                    // Store validated value
-                    $validatedData[$apiName] = $value;
-                } elseif ($field->is_required && ! isset($existingData[$apiName])) {
-                    // Field is required but not provided and not in existing data
-                    throw new RuntimeException("Field '{$field->label}' is required.");
-                } elseif (! isset($existingData[$apiName]) && $field->default_value !== null) {
-                    // Use default value if not provided and not in existing data
-                    $validatedData[$apiName] = $field->default_value;
-                }
-            }
-        }
-
-        return $validatedData;
     }
 
     /**
@@ -472,5 +440,43 @@ final class RecordService
             'created_last_7_days' => $recent,
             'updated_last_7_days' => $updated,
         ];
+    }
+
+    /**
+     * Validate and transform data according to module field definitions.
+     *
+     * @param  array<string, mixed>  $data  New data
+     * @param  array<string, mixed>  $existingData  Existing data (for updates)
+     * @return array<string, mixed>
+     */
+    private function validateAndTransformData(ModuleModel $module, array $data, array $existingData = []): array
+    {
+        $validatedData = $existingData;
+
+        // Get all fields from all blocks
+        foreach ($module->blocks as $block) {
+            foreach ($block->fields as $field) {
+                $apiName = $field->api_name;
+
+                // If field is present in data, validate it
+                if (array_key_exists($apiName, $data)) {
+                    $value = $data[$apiName];
+
+                    // Validate field value
+                    $this->fieldService->validateFieldValue($field, $value);
+
+                    // Store validated value
+                    $validatedData[$apiName] = $value;
+                } elseif ($field->is_required && ! isset($existingData[$apiName])) {
+                    // Field is required but not provided and not in existing data
+                    throw new RuntimeException("Field '{$field->label}' is required.");
+                } elseif (! isset($existingData[$apiName]) && $field->default_value !== null) {
+                    // Use default value if not provided and not in existing data
+                    $validatedData[$apiName] = $field->default_value;
+                }
+            }
+        }
+
+        return $validatedData;
     }
 }

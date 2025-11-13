@@ -1,0 +1,302 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - list [ref=e8]:
+      - listitem [ref=e9]:
+        - button "Laravel Starter Kit" [ref=e10]:
+          - link "Laravel Starter Kit" [ref=e11] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/
+            - generic [ref=e12]:
+              - img [ref=e14]
+              - generic [ref=e17]: Laravel Starter Kit
+    - generic [ref=e19]:
+      - generic [ref=e20]: Platform
+      - list [ref=e21]:
+        - listitem [ref=e22]:
+          - link "Dashboard" [ref=e23] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/
+            - button "Dashboard" [ref=e24]:
+              - img [ref=e25]
+              - generic [ref=e26]: Dashboard
+        - listitem [ref=e27]:
+          - link "Companies" [ref=e28] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/modules/companies
+            - button "Companies" [ref=e29]:
+              - img [ref=e30]
+              - generic [ref=e31]: Companies
+        - listitem [ref=e32]:
+          - link "Contacts" [ref=e33] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/modules/contacts
+            - button "Contacts" [ref=e34]:
+              - img [ref=e35]
+              - generic [ref=e36]: Contacts
+        - listitem [ref=e37]:
+          - link "Deals" [ref=e38] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/modules/deals
+            - button "Deals" [ref=e39]:
+              - img [ref=e40]
+              - generic [ref=e41]: Deals
+        - listitem [ref=e42]:
+          - link "Leads" [ref=e43] [cursor=pointer]:
+            - /url: http://acme.vrtxcrm.local/modules/leads
+            - button "Leads" [ref=e44]:
+              - img [ref=e45]
+              - generic [ref=e46]: Leads
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - generic:
+          - list
+      - list [ref=e49]:
+        - listitem [ref=e50]:
+          - button "AU Admin User" [ref=e51]:
+            - button "AU Admin User" [ref=e52]:
+              - generic [ref=e54]: AU
+              - generic [ref=e56]: Admin User
+              - img [ref=e57]
+  - main [ref=e58]:
+    - generic [ref=e59]:
+      - button "Toggle Sidebar" [ref=e62]:
+        - img
+        - generic [ref=e63]: Toggle Sidebar
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - heading "Contacts" [level=1] [ref=e67]
+            - paragraph [ref=e68]: Manage your contacts
+          - button "New Contact" [ref=e69]:
+            - img
+            - text: New Contact
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e73]:
+              - img [ref=e74]
+              - searchbox "Search..." [ref=e75]
+            - button "Export" [ref=e77]:
+              - img
+              - text: Export
+          - table [ref=e80]:
+            - rowgroup [ref=e81]:
+              - row "Select all rows ID First Name Last Name Email Phone Job Title Status Street Address City State/Province Postal Code Country Notes Created Actions" [ref=e82]:
+                - cell "Select all rows" [ref=e83]:
+                  - checkbox "Select all rows" [ref=e85]
+                - cell "ID" [ref=e86]:
+                  - button "ID" [ref=e87] [cursor=pointer]:
+                    - generic [ref=e88]: ID
+                    - img [ref=e90]
+                - cell "First Name" [ref=e91]:
+                  - button "First Name" [ref=e92] [cursor=pointer]:
+                    - generic [ref=e93]: First Name
+                    - img [ref=e95]
+                - cell "Last Name" [ref=e96]:
+                  - button "Last Name" [ref=e97] [cursor=pointer]:
+                    - generic [ref=e98]: Last Name
+                    - img [ref=e100]
+                - cell "Email" [ref=e101]:
+                  - button "Email" [ref=e102] [cursor=pointer]:
+                    - generic [ref=e103]: Email
+                    - img [ref=e105]
+                - cell "Phone" [ref=e106]:
+                  - button "Phone" [ref=e107] [cursor=pointer]:
+                    - generic [ref=e108]: Phone
+                    - img [ref=e110]
+                - cell "Job Title" [ref=e111]:
+                  - button "Job Title" [ref=e112] [cursor=pointer]:
+                    - generic [ref=e113]: Job Title
+                    - img [ref=e115]
+                - cell "Status" [ref=e116]:
+                  - button "Status" [ref=e117] [cursor=pointer]:
+                    - generic [ref=e118]: Status
+                    - img [ref=e120]
+                - cell "Street Address" [ref=e121]:
+                  - button "Street Address" [ref=e122] [cursor=pointer]:
+                    - generic [ref=e123]: Street Address
+                    - img [ref=e125]
+                - cell "City" [ref=e126]:
+                  - button "City" [ref=e127] [cursor=pointer]:
+                    - generic [ref=e128]: City
+                    - img [ref=e130]
+                - cell "State/Province" [ref=e131]:
+                  - button "State/Province" [ref=e132] [cursor=pointer]:
+                    - generic [ref=e133]: State/Province
+                    - img [ref=e135]
+                - cell "Postal Code" [ref=e136]:
+                  - button "Postal Code" [ref=e137] [cursor=pointer]:
+                    - generic [ref=e138]: Postal Code
+                    - img [ref=e140]
+                - cell "Country" [ref=e141]:
+                  - button "Country" [ref=e142] [cursor=pointer]:
+                    - generic [ref=e143]: Country
+                    - img [ref=e145]
+                - cell "Notes" [ref=e146]:
+                  - button "Notes" [ref=e147] [cursor=pointer]:
+                    - generic [ref=e148]: Notes
+                    - img [ref=e150]
+                - cell "Created" [ref=e151]:
+                  - button "Created" [ref=e152] [cursor=pointer]:
+                    - generic [ref=e153]: Created
+                    - img [ref=e155]
+                - cell "Actions" [ref=e156]:
+                  - button "Actions" [disabled] [ref=e157]:
+                    - generic [ref=e158]: Actions
+            - rowgroup [ref=e159]:
+              - row "Select row 2 Jane Smith jane.smith@techcorp.com +1 (555) 234-5678 active 456 Oak Ave New York NY 10001 United States Decision maker. Looking for CRM solutions. Nov 12, 2025, 05:45 PM 2" [ref=e160] [cursor=pointer]:
+                - cell "Select row" [ref=e161]:
+                  - checkbox "Select row" [ref=e163]
+                - cell "2" [ref=e164]:
+                  - generic [ref=e166]: "2"
+                - cell "Jane" [ref=e167]:
+                  - generic [ref=e169]: Jane
+                - cell "Smith" [ref=e170]:
+                  - generic [ref=e172]: Smith
+                - cell "jane.smith@techcorp.com" [ref=e173]:
+                  - link "jane.smith@techcorp.com" [ref=e175]:
+                    - /url: mailto:jane.smith@techcorp.com
+                - cell "+1 (555) 234-5678" [ref=e176]:
+                  - link "+1 (555) 234-5678" [ref=e178]:
+                    - /url: tel:+1 (555) 234-5678
+                - cell [ref=e179]
+                - cell "active" [ref=e180]:
+                  - generic [ref=e182]: active
+                - cell "456 Oak Ave" [ref=e183]:
+                  - generic [ref=e185]: 456 Oak Ave
+                - cell "New York" [ref=e186]:
+                  - generic [ref=e188]: New York
+                - cell "NY" [ref=e189]:
+                  - generic [ref=e191]: NY
+                - cell "10001" [ref=e192]:
+                  - generic [ref=e194]: "10001"
+                - cell "United States" [ref=e195]:
+                  - generic [ref=e197]: United States
+                - cell "Decision maker. Looking for CRM solutions." [ref=e198]:
+                  - generic [ref=e200]: Decision maker. Looking for CRM solutions.
+                - cell "Nov 12, 2025, 05:45 PM" [ref=e201]:
+                  - generic [ref=e203]: Nov 12, 2025, 05:45 PM
+                - cell "2" [ref=e204]:
+                  - generic [ref=e206]: "2"
+              - row "Select row 3 Bob Johnson bob.johnson@startup.io +1 (555) 345-6789 active 789 Pine Rd Austin TX 78701 United States Startup founder. Needs scalable solution. Nov 12, 2025, 05:45 PM 3" [ref=e207] [cursor=pointer]:
+                - cell "Select row" [ref=e208]:
+                  - checkbox "Select row" [ref=e210]
+                - cell "3" [ref=e211]:
+                  - generic [ref=e213]: "3"
+                - cell "Bob" [ref=e214]:
+                  - generic [ref=e216]: Bob
+                - cell "Johnson" [ref=e217]:
+                  - generic [ref=e219]: Johnson
+                - cell "bob.johnson@startup.io" [ref=e220]:
+                  - link "bob.johnson@startup.io" [ref=e222]:
+                    - /url: mailto:bob.johnson@startup.io
+                - cell "+1 (555) 345-6789" [ref=e223]:
+                  - link "+1 (555) 345-6789" [ref=e225]:
+                    - /url: tel:+1 (555) 345-6789
+                - cell [ref=e226]
+                - cell "active" [ref=e227]:
+                  - generic [ref=e229]: active
+                - cell "789 Pine Rd" [ref=e230]:
+                  - generic [ref=e232]: 789 Pine Rd
+                - cell "Austin" [ref=e233]:
+                  - generic [ref=e235]: Austin
+                - cell "TX" [ref=e236]:
+                  - generic [ref=e238]: TX
+                - cell "78701" [ref=e239]:
+                  - generic [ref=e241]: "78701"
+                - cell "United States" [ref=e242]:
+                  - generic [ref=e244]: United States
+                - cell "Startup founder. Needs scalable solution." [ref=e245]:
+                  - generic [ref=e247]: Startup founder. Needs scalable solution.
+                - cell "Nov 12, 2025, 05:45 PM" [ref=e248]:
+                  - generic [ref=e250]: Nov 12, 2025, 05:45 PM
+                - cell "3" [ref=e251]:
+                  - generic [ref=e253]: "3"
+              - row "Select row 4 Alice Williams alice.williams@enterprise.com +1 (555) 456-7890 active 321 Elm St Chicago IL 60601 United States Enterprise client. Requires custom integrations. Nov 12, 2025, 05:45 PM 4" [ref=e254] [cursor=pointer]:
+                - cell "Select row" [ref=e255]:
+                  - checkbox "Select row" [ref=e257]
+                - cell "4" [ref=e258]:
+                  - generic [ref=e260]: "4"
+                - cell "Alice" [ref=e261]:
+                  - generic [ref=e263]: Alice
+                - cell "Williams" [ref=e264]:
+                  - generic [ref=e266]: Williams
+                - cell "alice.williams@enterprise.com" [ref=e267]:
+                  - link "alice.williams@enterprise.com" [ref=e269]:
+                    - /url: mailto:alice.williams@enterprise.com
+                - cell "+1 (555) 456-7890" [ref=e270]:
+                  - link "+1 (555) 456-7890" [ref=e272]:
+                    - /url: tel:+1 (555) 456-7890
+                - cell [ref=e273]
+                - cell "active" [ref=e274]:
+                  - generic [ref=e276]: active
+                - cell "321 Elm St" [ref=e277]:
+                  - generic [ref=e279]: 321 Elm St
+                - cell "Chicago" [ref=e280]:
+                  - generic [ref=e282]: Chicago
+                - cell "IL" [ref=e283]:
+                  - generic [ref=e285]: IL
+                - cell "60601" [ref=e286]:
+                  - generic [ref=e288]: "60601"
+                - cell "United States" [ref=e289]:
+                  - generic [ref=e291]: United States
+                - cell "Enterprise client. Requires custom integrations." [ref=e292]:
+                  - generic [ref=e294]: Enterprise client. Requires custom integrations.
+                - cell "Nov 12, 2025, 05:45 PM" [ref=e295]:
+                  - generic [ref=e297]: Nov 12, 2025, 05:45 PM
+                - cell "4" [ref=e298]:
+                  - generic [ref=e300]: "4"
+              - row "Select row 5 Charlie Brown charlie.brown@consulting.com +1 (555) 567-8901 inactive 654 Maple Dr Seattle WA 98101 United States Previous client. May re-engage in Q2. Nov 12, 2025, 05:45 PM 5" [ref=e301] [cursor=pointer]:
+                - cell "Select row" [ref=e302]:
+                  - checkbox "Select row" [ref=e304]
+                - cell "5" [ref=e305]:
+                  - generic [ref=e307]: "5"
+                - cell "Charlie" [ref=e308]:
+                  - generic [ref=e310]: Charlie
+                - cell "Brown" [ref=e311]:
+                  - generic [ref=e313]: Brown
+                - cell "charlie.brown@consulting.com" [ref=e314]:
+                  - link "charlie.brown@consulting.com" [ref=e316]:
+                    - /url: mailto:charlie.brown@consulting.com
+                - cell "+1 (555) 567-8901" [ref=e317]:
+                  - link "+1 (555) 567-8901" [ref=e319]:
+                    - /url: tel:+1 (555) 567-8901
+                - cell [ref=e320]
+                - cell "inactive" [ref=e321]:
+                  - generic [ref=e323]: inactive
+                - cell "654 Maple Dr" [ref=e324]:
+                  - generic [ref=e326]: 654 Maple Dr
+                - cell "Seattle" [ref=e327]:
+                  - generic [ref=e329]: Seattle
+                - cell "WA" [ref=e330]:
+                  - generic [ref=e332]: WA
+                - cell "98101" [ref=e333]:
+                  - generic [ref=e335]: "98101"
+                - cell "United States" [ref=e336]:
+                  - generic [ref=e338]: United States
+                - cell "Previous client. May re-engage in Q2." [ref=e339]:
+                  - generic [ref=e341]: Previous client. May re-engage in Q2.
+                - cell "Nov 12, 2025, 05:45 PM" [ref=e342]:
+                  - generic [ref=e344]: Nov 12, 2025, 05:45 PM
+                - cell "5" [ref=e345]:
+                  - generic [ref=e347]: "5"
+          - generic [ref=e348]:
+            - generic [ref=e349]:
+              - generic [ref=e350]: Showing 1 to 4 of 4 results
+              - generic [ref=e351]:
+                - generic [ref=e352]: Rows per page
+                - button "50" [ref=e353]:
+                  - generic [ref=e354]: "50"
+                  - img
+            - generic [ref=e355]:
+              - generic [ref=e356]: Page 1 of 1
+              - button "First page" [disabled]:
+                - img
+                - generic: First page
+              - button "Previous page" [disabled]:
+                - img
+                - generic: Previous page
+              - button "Next page" [disabled]:
+                - img
+                - generic: Next page
+              - button "Last page" [disabled]:
+                - img
+                - generic: Last page
+```

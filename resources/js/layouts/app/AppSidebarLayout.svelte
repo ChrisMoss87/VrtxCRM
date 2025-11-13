@@ -14,7 +14,7 @@
     let { breadcrumbs = [], children }: Props = $props();
 </script>
 
-<AppShell variant="sidebar">
+<AppShell variant="sidebar" class="w-full">
     <AppSidebar />
     <AppContent variant="sidebar" class="overflow-x-hidden">
         <AppSidebarHeader {breadcrumbs} />

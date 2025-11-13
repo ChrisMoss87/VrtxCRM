@@ -1,0 +1,282 @@
+<script lang="ts">
+	import { router } from '@inertiajs/svelte';
+	import { Button } from '@/components/ui/button';
+	import { Input } from '@/components/ui/input';
+	import { Label } from '@/components/ui/label';
+	import { Textarea } from '@/components/ui/textarea';
+	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+	import { Switch } from '@/components/ui/switch';
+	import AppLayout from '@/layouts/app/AppSidebarLayout.svelte';
+	import { ArrowLeft, Save, Loader2 } from 'lucide-svelte';
+	import { toast } from 'svelte-sonner';
+
+	let name = $state('');
+	let singularName = $state('');
+	let apiName = $state('');
+	let icon = $state('');
+	let description = $state('');
+	let isActive = $state(true);
+	let order = $state(0);
+
+	let saving = $state(false);
+	let errors = $state<Record<string, string>>({});
+
+	// Auto-generate API name from name
+	$effect(() => {
+		if (name && !apiName) {
+			// Convert to snake_case plural
+			apiName = name
+				.toLowerCase()
+				.replace(/\s+/g, '_')
+				.replace(/[^a-z0-9_]/g, '');
+
+			// Make it plural if not already
+			if (!apiName.endsWith('s')) {
+				apiName += 's';
+			}
+		}
+	});
+
+	// Auto-generate singular name from name
+	$effect(() => {
+		if (name && !singularName) {
+			// Remove trailing 's' if present
+			singularName = name.endsWith('s') ? name.slice(0, -1) : name;
+		}
+	});
+
+	function handleCancel() {
+		router.visit('/admin/modules');
+	}
+
+	async function handleSave() {
+		errors = {};
+		saving = true;
+
+		try {
+			const response = await fetch('/api/admin/modules', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+				},
+				body: JSON.stringify({
+					name,
+					singular_name: singularName,
+					api_name: apiName,
+					icon: icon || null,
+					description: description || null,
+					is_active: isActive,
+					order
+				})
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				if (data.errors) {
+					errors = data.errors;
+					toast.error('Validation failed. Please check the form.');
+				} else {
+					toast.error(data.error || 'Failed to create module');
+				}
+				return;
+			}
+
+			toast.success('Module created successfully!');
+			router.visit(`/admin/modules/${data.module.id}/edit`);
+		} catch (error) {
+			console.error('Failed to create module:', error);
+			toast.error('An error occurred. Please try again.');
+		} finally {
+			saving = false;
+		}
+	}
+
+	// Common icons for modules
+	const commonIcons = [
+		'📋', '👥', '🏢', '💼', '📊', '📈', '💰', '🎯', '📅', '✉️',
+		'📞', '🏠', '🚀', '⚙️', '🎨', '📦', '🔧', '💡', '🔔', '📝'
+	];
+</script>
+
+<svelte:head>
+	<title>Create Module | VrtxCRM</title>
+</svelte:head>
+
+<AppLayout>
+	<div class="flex flex-col gap-6 max-w-4xl">
+		<!-- Header -->
+		<div class="flex items-center gap-4">
+			<Button variant="outline" size="icon" onclick={handleCancel}>
+				<ArrowLeft class="h-4 w-4" />
+			</Button>
+			<div>
+				<h1 class="text-3xl font-bold tracking-tight">Create Module</h1>
+				<p class="text-muted-foreground">
+					Define a new custom module for your CRM
+				</p>
+			</div>
+		</div>
+
+		<form onsubmit={(e) => { e.preventDefault(); handleSave(); }}>
+			<div class="space-y-6">
+				<!-- Basic Information -->
+				<Card>
+					<CardHeader>
+						<CardTitle>Basic Information</CardTitle>
+						<CardDescription>
+							Provide the basic details for your module
+						</CardDescription>
+					</CardHeader>
+					<CardContent class="space-y-4">
+						<!-- Module Name -->
+						<div class="space-y-2">
+							<Label for="name">Module Name *</Label>
+							<Input
+								id="name"
+								bind:value={name}
+								placeholder="e.g., Projects, Leads, Invoices"
+								required
+								autofocus
+							/>
+							{#if errors.name}
+								<p class="text-sm text-destructive">{errors.name[0]}</p>
+							{/if}
+							<p class="text-xs text-muted-foreground">
+								The plural name displayed in navigation and lists
+							</p>
+						</div>
+
+						<!-- Singular Name -->
+						<div class="space-y-2">
+							<Label for="singular_name">Singular Name *</Label>
+							<Input
+								id="singular_name"
+								bind:value={singularName}
+								placeholder="e.g., Project, Lead, Invoice"
+								required
+							/>
+							{#if errors.singular_name}
+								<p class="text-sm text-destructive">{errors.singular_name[0]}</p>
+							{/if}
+							<p class="text-xs text-muted-foreground">
+								Used for single records (e.g., "Create Project")
+							</p>
+						</div>
+
+						<!-- API Name -->
+						<div class="space-y-2">
+							<Label for="api_name">API Name *</Label>
+							<Input
+								id="api_name"
+								bind:value={apiName}
+								placeholder="e.g., projects, leads, invoices"
+								pattern="[a-z][a-z0-9_]*"
+								required
+							/>
+							{#if errors.api_name}
+								<p class="text-sm text-destructive">{errors.api_name[0]}</p>
+							{/if}
+							<p class="text-xs text-muted-foreground">
+								Lowercase, snake_case identifier for API and URLs
+							</p>
+						</div>
+
+						<!-- Icon -->
+						<div class="space-y-2">
+							<Label for="icon">Icon</Label>
+							<div class="flex gap-2">
+								<Input
+									id="icon"
+									bind:value={icon}
+									placeholder="Choose an emoji or leave empty"
+									class="w-24"
+								/>
+								<div class="flex flex-wrap gap-2">
+									{#each commonIcons as emoji}
+										<button
+											type="button"
+											onclick={() => (icon = emoji)}
+											class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center text-xl"
+										>
+											{emoji}
+										</button>
+									{/each}
+								</div>
+							</div>
+							<p class="text-xs text-muted-foreground">
+								Select an emoji to represent this module
+							</p>
+						</div>
+
+						<!-- Description -->
+						<div class="space-y-2">
+							<Label for="description">Description</Label>
+							<Textarea
+								id="description"
+								bind:value={description}
+								placeholder="What is this module used for?"
+								rows={3}
+							/>
+							<p class="text-xs text-muted-foreground">
+								Help users understand the purpose of this module
+							</p>
+						</div>
+
+						<!-- Display Order -->
+						<div class="space-y-2">
+							<Label for="order">Display Order</Label>
+							<Input
+								id="order"
+								type="number"
+								bind:value={order}
+								min="0"
+								placeholder="0"
+							/>
+							<p class="text-xs text-muted-foreground">
+								Controls the position in navigation (lower numbers appear first)
+							</p>
+						</div>
+
+						<!-- Active Status -->
+						<div class="flex items-center justify-between space-x-2 rounded-lg border p-4">
+							<div class="space-y-0.5">
+								<Label for="is_active">Active</Label>
+								<p class="text-sm text-muted-foreground">
+									Inactive modules are hidden from users
+								</p>
+							</div>
+							<Switch id="is_active" bind:checked={isActive} />
+						</div>
+					</CardContent>
+				</Card>
+
+				<!-- Actions -->
+				<div class="flex items-center gap-4">
+					<Button type="submit" disabled={saving}>
+						{#if saving}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Creating...
+						{:else}
+							<Save class="mr-2 h-4 w-4" />
+							Create Module
+						{/if}
+					</Button>
+					<Button type="button" variant="outline" onclick={handleCancel} disabled={saving}>
+						Cancel
+					</Button>
+				</div>
+
+				<!-- Help Text -->
+				<Card class="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
+					<CardContent class="pt-6">
+						<p class="text-sm text-blue-900 dark:text-blue-100">
+							<strong>Next steps:</strong> After creating the module, you'll be able to add fields, organize them into blocks, and configure relationships with other modules.
+						</p>
+					</CardContent>
+				</Card>
+			</div>
+		</form>
+	</div>
+</AppLayout>

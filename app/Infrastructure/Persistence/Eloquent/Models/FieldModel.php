@@ -17,6 +17,7 @@ final class FieldModel extends Model
 
     protected $fillable = [
         'block_id',
+        'relationship_id',
         'type',
         'api_name',
         'label',
@@ -34,6 +35,7 @@ final class FieldModel extends Model
 
     protected $casts = [
         'block_id' => 'integer',
+        'relationship_id' => 'integer',
         'is_required' => 'boolean',
         'is_unique' => 'boolean',
         'is_searchable' => 'boolean',
@@ -46,6 +48,11 @@ final class FieldModel extends Model
     public function block(): BelongsTo
     {
         return $this->belongsTo(BlockModel::class, 'block_id');
+    }
+
+    public function relationship(): BelongsTo
+    {
+        return $this->belongsTo(ModuleRelationshipModel::class, 'relationship_id');
     }
 
     public function options(): HasMany

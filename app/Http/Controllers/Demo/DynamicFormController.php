@@ -13,7 +13,7 @@ final class DynamicFormController extends Controller
 {
     public function index(): Response
     {
-        $module = ModuleModel::with(['blocks.fields.fieldOptions'])
+        $module = ModuleModel::with(['blocks.fields.options'])
             ->where('name', 'Test Form')
             ->firstOrFail();
 

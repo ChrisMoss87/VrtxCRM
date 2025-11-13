@@ -25,7 +25,7 @@
 	let {
 		label,
 		name,
-		value = $bindable(''),
+		value = $bindable(),
 		options,
 		description,
 		error,
@@ -49,10 +49,10 @@
 	{#snippet children(props)}
 		<Select.Root selected={{ value, label: options.find(o => o.value === value)?.label ?? placeholder }} onSelectedChange={(selected) => handleValueChange(selected?.value)}>
 			<Select.Trigger {...props}>
-				<Select.Value {placeholder} />
+				{options.find(o => o.value === value)?.label ?? placeholder}
 			</Select.Trigger>
 			<Select.Content>
-				{#each options as option}
+				{#each options as option (option.value)}
 					<Select.Item value={option.value}>
 						{option.label}
 					</Select.Item>

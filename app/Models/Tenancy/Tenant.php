@@ -18,6 +18,30 @@ final class Tenant extends BaseTenant implements TenantWithDatabase
     use HasFactory;
 
     /**
+     * Possible tenant statuses.
+     */
+    public const STATUS_TRIAL = 'trial';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_PAST_DUE = 'past_due';
+
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    /**
+     * Possible tenant plans.
+     */
+    public const PLAN_TRIAL = 'trial';
+
+    public const PLAN_STARTER = 'starter';
+
+    public const PLAN_PROFESSIONAL = 'professional';
+
+    public const PLAN_ENTERPRISE = 'enterprise';
+
+    /**
      * The attributes that are mass assignable.
      */
     protected $fillable = [
@@ -66,30 +90,6 @@ final class Tenant extends BaseTenant implements TenantWithDatabase
             'stripe_subscription_id',
         ];
     }
-
-    /**
-     * Possible tenant statuses.
-     */
-    public const STATUS_TRIAL = 'trial';
-
-    public const STATUS_ACTIVE = 'active';
-
-    public const STATUS_PAST_DUE = 'past_due';
-
-    public const STATUS_SUSPENDED = 'suspended';
-
-    public const STATUS_CANCELLED = 'cancelled';
-
-    /**
-     * Possible tenant plans.
-     */
-    public const PLAN_TRIAL = 'trial';
-
-    public const PLAN_STARTER = 'starter';
-
-    public const PLAN_PROFESSIONAL = 'professional';
-
-    public const PLAN_ENTERPRISE = 'enterprise';
 
     /**
      * Check if tenant is on trial.

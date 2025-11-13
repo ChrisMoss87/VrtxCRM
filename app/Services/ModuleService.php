@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Infrastructure\Persistence\Eloquent\Models\BlockModel;
 use App\Infrastructure\Persistence\Eloquent\Models\FieldModel;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -17,6 +18,7 @@ final class ModuleService
      * Create a new module with blocks and fields.
      *
      * @param  array{name: string, singular_name: string, api_name?: string, icon?: string, description?: string, is_active?: bool, blocks?: array}  $data
+     *
      * @throws RuntimeException If module creation fails
      */
     public function createModule(array $data): ModuleModel
@@ -51,7 +53,7 @@ final class ModuleService
             DB::commit();
 
             return $module->fresh(['blocks.fields']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create module: {$e->getMessage()}", 0, $e);
         }
@@ -93,7 +95,7 @@ final class ModuleService
             DB::commit();
 
             return $module->fresh(['blocks.fields']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update module: {$e->getMessage()}", 0, $e);
         }
@@ -126,7 +128,7 @@ final class ModuleService
             $module->delete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete module: {$e->getMessage()}", 0, $e);
         }
@@ -137,6 +139,7 @@ final class ModuleService
      *
      * @param  array{type: string, label: string, order?: int, settings?: array, fields?: array}  $data
      * @param  bool  $allowSystem  Allow creating blocks in system modules (used during initial module creation)
+     *
      * @throws RuntimeException If block creation fails
      */
     public function createBlock(int $moduleId, array $data, bool $allowSystem = false): BlockModel
@@ -169,7 +172,7 @@ final class ModuleService
             DB::commit();
 
             return $block->fresh(['fields']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create block: {$e->getMessage()}", 0, $e);
         }
@@ -202,7 +205,7 @@ final class ModuleService
             DB::commit();
 
             return $block->fresh(['fields']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update block: {$e->getMessage()}", 0, $e);
         }
@@ -228,37 +231,10 @@ final class ModuleService
             $block->delete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete block: {$e->getMessage()}", 0, $e);
         }
-    }
-
-    /**
-     * Create a field within a block (internal helper).
-     */
-    private function createFieldInBlock(int $blockId, array $data): FieldModel
-    {
-        // Validate field api_name uniqueness within block
-        $apiName = $data['api_name'] ?? Str::snake($data['label']);
-        $this->validateFieldApiName($blockId, $apiName);
-
-        return FieldModel::create([
-            'block_id' => $blockId,
-            'type' => $data['type'],
-            'api_name' => $apiName,
-            'label' => $data['label'],
-            'description' => $data['description'] ?? null,
-            'help_text' => $data['help_text'] ?? null,
-            'is_required' => $data['is_required'] ?? false,
-            'is_unique' => $data['is_unique'] ?? false,
-            'is_searchable' => $data['is_searchable'] ?? false,
-            'order' => $data['order'] ?? 0,
-            'default_value' => $data['default_value'] ?? null,
-            'validation_rules' => $data['validation_rules'] ?? [],
-            'settings' => $data['settings'] ?? [],
-            'width' => $data['width'] ?? 100,
-        ]);
     }
 
     /**
@@ -323,7 +299,7 @@ final class ModuleService
             }
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to reorder modules: {$e->getMessage()}", 0, $e);
         }
@@ -354,10 +330,56 @@ final class ModuleService
             }
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to reorder blocks: {$e->getMessage()}", 0, $e);
         }
+    }
+
+    /**
+     * Get module statistics.
+     */
+    public function getModuleStats(int $moduleId): array
+    {
+        $module = ModuleModel::findOrFail($moduleId);
+
+        return [
+            'name' => $module->name,
+            'api_name' => $module->api_name,
+            'total_blocks' => $module->blocks()->count(),
+            'total_fields' => $module->fields()->count(),
+            'total_records' => $module->records()->count(),
+            'is_active' => $module->is_active,
+            'is_system' => $module->is_system,
+            'created_at' => $module->created_at,
+        ];
+    }
+
+    /**
+     * Create a field within a block (internal helper).
+     */
+    private function createFieldInBlock(int $blockId, array $data): FieldModel
+    {
+        // Validate field api_name uniqueness within block
+        $apiName = $data['api_name'] ?? Str::snake($data['label']);
+        $this->validateFieldApiName($blockId, $apiName);
+
+        return FieldModel::create([
+            'block_id' => $blockId,
+            'type' => $data['type'],
+            'api_name' => $apiName,
+            'label' => $data['label'],
+            'description' => $data['description'] ?? null,
+            'help_text' => $data['help_text'] ?? null,
+            'is_required' => $data['is_required'] ?? false,
+            'is_unique' => $data['is_unique'] ?? false,
+            'is_searchable' => $data['is_searchable'] ?? false,
+            'order' => $data['order'] ?? 0,
+            'default_value' => $data['default_value'] ?? null,
+            'validation_rules' => $data['validation_rules'] ?? [],
+            'settings' => $data['settings'] ?? [],
+            'width' => $data['width'] ?? 100,
+        ]);
     }
 
     /**
@@ -395,24 +417,5 @@ final class ModuleService
         if ($query->exists()) {
             throw new RuntimeException("Field with api_name '{$apiName}' already exists in this block.");
         }
-    }
-
-    /**
-     * Get module statistics.
-     */
-    public function getModuleStats(int $moduleId): array
-    {
-        $module = ModuleModel::findOrFail($moduleId);
-
-        return [
-            'name' => $module->name,
-            'api_name' => $module->api_name,
-            'total_blocks' => $module->blocks()->count(),
-            'total_fields' => $module->fields()->count(),
-            'total_records' => $module->records()->count(),
-            'is_active' => $module->is_active,
-            'is_system' => $module->is_system,
-            'created_at' => $module->created_at,
-        ];
     }
 }

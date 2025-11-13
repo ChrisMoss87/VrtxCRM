@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Services\TenantService;
+use Exception;
 use Illuminate\Database\Seeder;
 
 final class TenantSeeder extends Seeder
@@ -64,13 +65,13 @@ final class TenantSeeder extends Seeder
                 }
 
                 $this->command->info("✓ Created tenant: {$tenantData['name']} ({$tenantData['subdomain']})");
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->command->error("✗ Failed to create tenant {$tenantData['name']}: {$e->getMessage()}");
             }
         }
 
         $this->command->info("\n✓ Tenant seeding completed!");
-        $this->command->info("Access tenants at:");
+        $this->command->info('Access tenants at:');
         foreach ($tenants as $t) {
             $this->command->line("  • http://{$t['subdomain']}.vrtxcrm.local");
         }

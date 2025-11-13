@@ -19,7 +19,7 @@ final class TenantDatabaseSeeder extends Seeder
         $tenantData = tenant('data');
         $adminEmail = $tenantData['admin_email'] ?? 'admin@test.com';
 
-        $this->command->info("Tenant data: ".json_encode($tenantData));
+        $this->command->info('Tenant data: '.json_encode($tenantData));
         $this->command->info("Using admin email: {$adminEmail}");
 
         // Create default admin user for tenant
@@ -30,10 +30,10 @@ final class TenantDatabaseSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        $this->command->info("✓ Created admin user for tenant: ".tenant('name'));
+        $this->command->info('✓ Created admin user for tenant: '.tenant('name'));
 
         // Seed CRM modules
         $this->call(ModuleSeeder::class);
-        $this->command->info("✓ Seeded CRM modules for tenant: ".tenant('name'));
+        $this->command->info('✓ Seeded CRM modules for tenant: '.tenant('name'));
     }
 }

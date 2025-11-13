@@ -5,29 +5,36 @@
     import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
     import { dashboard } from '@/routes';
     import { type NavItem } from '@/types';
-    import { Link } from '@inertiajs/svelte';
-    import { BookOpen, Folder, LayoutGrid } from 'lucide-svelte';
+    import { Link, page } from '@inertiajs/svelte';
+    import { BookOpen, Folder, LayoutGrid, Users, Building, DollarSign, Briefcase } from 'lucide-svelte';
     import AppLogo from './AppLogo.svelte';
+
+    // Icon mapping for modules
+    const moduleIconMap: Record<string, any> = {
+        users: Users,
+        building: Building,
+        'dollar-sign': DollarSign,
+        briefcase: Briefcase,
+    };
+
+    // Get modules from shared Inertia data
+    const modules = $page.props.modules as Array<{id: number, name: string, api_name: string, icon: string}> || [];
 
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
-            href: '/dashboard',
+            href: '/',
             icon: LayoutGrid,
         },
+        ...modules.map(module => ({
+            title: module.name,
+            href: `/modules/${module.api_name}`,
+            icon: moduleIconMap[module.icon] || Folder,
+        })),
     ];
 
     const footerNavItems: NavItem[] = [
-        {
-            title: 'Repository',
-            href: 'https://github.com/oseughu/svelte-starter-kit',
-            icon: Folder,
-        },
-        {
-            title: 'Documentation',
-            href: 'https://laravel.com/docs/starter-kits',
-            icon: BookOpen,
-        },
+
     ];
 </script>
 

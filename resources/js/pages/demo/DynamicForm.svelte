@@ -57,7 +57,20 @@
 
 	const { module } = $page.props as { module: Module };
 
-	let formData: Record<string, string> = $state({});
+	// Initialize formData with empty strings for all fields
+	const initializeFormData = () => {
+		const data: Record<string, string> = {};
+
+		module.blocks.forEach(block => {
+			block.fields.forEach(field => {
+				data[field.api_name] = '';
+			});
+		});
+
+		return data;
+	};
+
+	let formData = $state(initializeFormData());
 
 	function handleSubmit(e: Event) {
 		e.preventDefault();

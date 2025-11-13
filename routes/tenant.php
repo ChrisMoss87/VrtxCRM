@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\ModuleController;
+use App\Http\Controllers\Api\ModuleRecordController;
+use App\Http\Controllers\Api\TableViewController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ModuleViewController;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -32,6 +36,73 @@ Route::middleware([
     // Tenant dashboard - require authentication
     Route::middleware('auth')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Admin Module Builder routes
+        Route::prefix('admin/modules')->name('admin.modules.')->group(function () {
+            Route::get('/', [App\Http\Controllers\Admin\ModuleBuilderController::class, 'index'])->name('index');
+            Route::get('/create', [App\Http\Controllers\Admin\ModuleBuilderController::class, 'create'])->name('create');
+            Route::get('/{id}/edit', [App\Http\Controllers\Admin\ModuleBuilderController::class, 'edit'])->name('edit');
+        });
+
+        // Module web routes (Inertia views)
+        Route::prefix('modules/{moduleApiName}')->group(function () {
+            Route::get('/', [ModuleViewController::class, 'index'])->name('modules.index');
+            Route::get('/create', [ModuleViewController::class, 'create'])->name('modules.create');
+            Route::get('/{id}', [ModuleViewController::class, 'show'])->name('modules.show');
+            Route::get('/{id}/edit', [ModuleViewController::class, 'edit'])->name('modules.edit');
+        });
+
+        // API routes for modules and records
+        Route::prefix('api')->group(function () {
+            // Module endpoints
+            Route::get('modules', [ModuleController::class, 'index'])->name('api.modules.index');
+            Route::get('modules/{apiName}', [ModuleController::class, 'show'])->name('api.modules.show');
+
+            // Module relationship endpoints
+            Route::get('relationships', [App\Http\Controllers\Api\ModuleRelationshipController::class, 'index'])->name('api.relationships.index');
+            Route::post('relationships', [App\Http\Controllers\Api\ModuleRelationshipController::class, 'store'])->name('api.relationships.store');
+            Route::get('relationships/{id}', [App\Http\Controllers\Api\ModuleRelationshipController::class, 'show'])->name('api.relationships.show');
+            Route::put('relationships/{id}', [App\Http\Controllers\Api\ModuleRelationshipController::class, 'update'])->name('api.relationships.update');
+            Route::delete('relationships/{id}', [App\Http\Controllers\Api\ModuleRelationshipController::class, 'destroy'])->name('api.relationships.destroy');
+
+            // Related records endpoints
+            Route::get('relationships/{relationshipId}/available', [App\Http\Controllers\Api\RelatedRecordsController::class, 'available'])->name('api.relationships.available');
+            Route::post('relationships/{relationshipId}/link', [App\Http\Controllers\Api\RelatedRecordsController::class, 'link'])->name('api.relationships.link');
+            Route::post('relationships/{relationshipId}/unlink', [App\Http\Controllers\Api\RelatedRecordsController::class, 'unlink'])->name('api.relationships.unlink');
+
+            // Module record endpoints
+            Route::get('modules/{moduleApiName}/records', [ModuleRecordController::class, 'index'])->name('api.modules.records.index');
+            Route::post('modules/{moduleApiName}/records', [ModuleRecordController::class, 'store'])->name('api.modules.records.store');
+            Route::get('modules/{moduleApiName}/records/{id}', [ModuleRecordController::class, 'show'])->name('api.modules.records.show');
+            Route::get('modules/{moduleApiName}/records/{id}/related', [App\Http\Controllers\Api\RelatedRecordsController::class, 'index'])->name('api.modules.records.related');
+            Route::put('modules/{moduleApiName}/records/{id}', [ModuleRecordController::class, 'update'])->name('api.modules.records.update');
+            Route::delete('modules/{moduleApiName}/records/{id}', [ModuleRecordController::class, 'destroy'])->name('api.modules.records.destroy');
+
+            // Table view endpoints
+            Route::get('table-views', [TableViewController::class, 'index'])->name('api.table-views.index');
+            Route::post('table-views', [TableViewController::class, 'store'])->name('api.table-views.store');
+            Route::get('table-views/{tableView}', [TableViewController::class, 'show'])->name('api.table-views.show');
+            Route::put('table-views/{tableView}', [TableViewController::class, 'update'])->name('api.table-views.update');
+            Route::delete('table-views/{tableView}', [TableViewController::class, 'destroy'])->name('api.table-views.destroy');
+            Route::post('table-views/{tableView}/duplicate', [TableViewController::class, 'duplicate'])->name('api.table-views.duplicate');
+
+            // User preference endpoints
+            Route::get('user/preferences', [App\Http\Controllers\Api\UserPreferenceController::class, 'show'])->name('api.user.preferences.show');
+            Route::put('user/preferences', [App\Http\Controllers\Api\UserPreferenceController::class, 'update'])->name('api.user.preferences.update');
+            Route::post('user/preferences/default-view', [App\Http\Controllers\Api\UserPreferenceController::class, 'setDefaultView'])->name('api.user.preferences.set-default-view');
+            Route::delete('user/preferences/default-view', [App\Http\Controllers\Api\UserPreferenceController::class, 'clearDefaultView'])->name('api.user.preferences.clear-default-view');
+
+            // Admin Module Management API
+            Route::prefix('admin/modules')->name('api.admin.modules.')->group(function () {
+                Route::get('/', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'index'])->name('index');
+                Route::post('/', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'store'])->name('store');
+                Route::get('/{id}', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'show'])->name('show');
+                Route::put('/{id}', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'update'])->name('update');
+                Route::delete('/{id}', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'destroy'])->name('destroy');
+                Route::patch('/{id}/activate', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'activate'])->name('activate');
+                Route::patch('/{id}/deactivate', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'deactivate'])->name('deactivate');
+            });
+        });
 
         // Settings routes
         require __DIR__.'/settings.php';

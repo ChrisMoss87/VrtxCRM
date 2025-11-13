@@ -6,6 +6,7 @@ namespace Tests\Feature\Tenancy;
 
 use App\Models\Tenancy\Tenant;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -26,14 +27,9 @@ final class TenantTest extends TestCase
             foreach ($existingTenants as $tenant) {
                 $tenant->delete();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             //
         }
-    }
-
-    protected function beginDatabaseTransaction()
-    {
-        //
     }
 
     protected function tearDown(): void
@@ -43,7 +39,7 @@ final class TenantTest extends TestCase
             foreach ($tenants as $tenant) {
                 $tenant->delete();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             //
         }
 
@@ -218,5 +214,10 @@ final class TenantTest extends TestCase
         $this->assertNotNull($tenant->subscription_ends_at);
         $this->assertEquals($trialEndsAt->toDateString(), $tenant->trial_ends_at->toDateString());
         $this->assertEquals($subscriptionEndsAt->toDateString(), $tenant->subscription_ends_at->toDateString());
+    }
+
+    protected function beginDatabaseTransaction()
+    {
+        //
     }
 }

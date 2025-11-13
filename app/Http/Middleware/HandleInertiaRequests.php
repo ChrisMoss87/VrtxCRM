@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Middleware;
 
+use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use Tighten\Ziggy\Ziggy;
 
-class HandleInertiaRequests extends Middleware
+final class HandleInertiaRequests extends Middleware
 {
     /**
      * The root template that's loaded on the first page visit.
@@ -39,14 +41,31 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        // Get modules for navigation (only if user is authenticated and tenant is initialized)
+        $modules = [];
+        if ($request->user() && tenancy()->initialized) {
+            // Only select needed columns to reduce query overhead
+            $modules = ModuleModel::select('id', 'name', 'api_name', 'icon')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($module) => [
+                    'id' => $module->id,
+                    'name' => $module->name,
+                    'api_name' => $module->api_name,
+                    'icon' => $module->icon,
+                ])
+                ->toArray();
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
+            'quote' => ['message' => mb_trim($message), 'author' => mb_trim($author)],
             'auth' => [
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'modules' => $modules,
         ];
     }
 }

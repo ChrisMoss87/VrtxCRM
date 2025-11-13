@@ -13,6 +13,11 @@ final class TenantSetting extends Model
     use HasFactory;
 
     /**
+     * Indicates if the model should be timestamped.
+     */
+    public $timestamps = true;
+
+    /**
      * The attributes that are mass assignable.
      */
     protected $fillable = [
@@ -28,11 +33,6 @@ final class TenantSetting extends Model
     protected $casts = [
         'value' => 'json',
     ];
-
-    /**
-     * Indicates if the model should be timestamped.
-     */
-    public $timestamps = true;
 
     /**
      * Get the tenant that owns the setting.

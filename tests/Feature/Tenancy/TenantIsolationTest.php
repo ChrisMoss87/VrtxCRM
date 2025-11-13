@@ -7,6 +7,7 @@ namespace Tests\Feature\Tenancy;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
 use App\Models\Tenancy\Tenant;
 use App\Models\User;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -27,16 +28,11 @@ final class TenantIsolationTest extends TestCase
             foreach ($existingTenants as $tenant) {
                 $tenant->delete();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             //
         }
 
         $this->artisan('tenants:migrate');
-    }
-
-    protected function beginDatabaseTransaction()
-    {
-        //
     }
 
     protected function tearDown(): void
@@ -46,7 +42,7 @@ final class TenantIsolationTest extends TestCase
             foreach ($tenants as $tenant) {
                 $tenant->delete();
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             //
         }
 
@@ -180,5 +176,10 @@ final class TenantIsolationTest extends TestCase
 
         $afterDb = DB::connection()->getDatabaseName();
         $this->assertEquals($centralDb, $afterDb);
+    }
+
+    protected function beginDatabaseTransaction()
+    {
+        //
     }
 }

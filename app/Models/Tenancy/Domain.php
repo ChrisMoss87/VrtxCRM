@@ -40,7 +40,7 @@ final class Domain extends BaseDomain
     public function markAsPrimary(): void
     {
         // Remove primary flag from other domains
-        static::where('tenant_id', $this->tenant_id)
+        self::where('tenant_id', $this->tenant_id)
             ->where('id', '!=', $this->id)
             ->update(['is_primary' => false]);
 

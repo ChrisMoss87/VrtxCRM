@@ -20,7 +20,7 @@
 	let {
 		label,
 		name,
-		value = $bindable(''),
+		value = $bindable(),
 		description,
 		error,
 		required = false,

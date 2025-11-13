@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Infrastructure\Persistence\Eloquent\Models\FieldModel;
 use App\Infrastructure\Persistence\Eloquent\Models\FieldOptionModel;
+use DateTimeImmutable;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -53,6 +55,7 @@ final class FieldService
      * Create a new field.
      *
      * @param  array{block_id: int, type: string, label: string, api_name?: string, description?: string, help_text?: string, is_required?: bool, is_unique?: bool, is_searchable?: bool, order?: int, default_value?: string, validation_rules?: array, settings?: array, width?: int, options?: array}  $data
+     *
      * @throws RuntimeException If field creation fails
      */
     public function createField(array $data): FieldModel
@@ -96,7 +99,7 @@ final class FieldService
             DB::commit();
 
             return $field->fresh(['options']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create field: {$e->getMessage()}", 0, $e);
         }
@@ -148,7 +151,7 @@ final class FieldService
             DB::commit();
 
             return $field->fresh(['options']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update field: {$e->getMessage()}", 0, $e);
         }
@@ -174,7 +177,7 @@ final class FieldService
             $field->delete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete field: {$e->getMessage()}", 0, $e);
         }
@@ -184,6 +187,7 @@ final class FieldService
      * Create a field option.
      *
      * @param  array{label: string, value: string, color?: string, order?: int, is_default?: bool}  $data
+     *
      * @throws RuntimeException If option creation fails
      */
     public function createFieldOption(int $fieldId, array $data): FieldOptionModel
@@ -216,7 +220,7 @@ final class FieldService
             DB::commit();
 
             return $option;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create field option: {$e->getMessage()}", 0, $e);
         }
@@ -252,7 +256,7 @@ final class FieldService
             DB::commit();
 
             return $option;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update field option: {$e->getMessage()}", 0, $e);
         }
@@ -272,7 +276,7 @@ final class FieldService
             $option->delete();
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete field option: {$e->getMessage()}", 0, $e);
         }
@@ -303,7 +307,7 @@ final class FieldService
             }
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to reorder fields: {$e->getMessage()}", 0, $e);
         }
@@ -334,7 +338,7 @@ final class FieldService
             }
 
             DB::commit();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to reorder field options: {$e->getMessage()}", 0, $e);
         }
@@ -359,25 +363,6 @@ final class FieldService
             ->orderBy('order')
             ->orderBy('label')
             ->get();
-    }
-
-    /**
-     * Validate field api_name is unique within block.
-     *
-     * @throws RuntimeException If api_name is taken
-     */
-    private function validateFieldApiName(int $blockId, string $apiName, ?int $excludeFieldId = null): void
-    {
-        $query = FieldModel::where('block_id', $blockId)
-            ->where('api_name', $apiName);
-
-        if ($excludeFieldId) {
-            $query->where('id', '!=', $excludeFieldId);
-        }
-
-        if ($query->exists()) {
-            throw new RuntimeException("Field with api_name '{$apiName}' already exists in this block.");
-        }
     }
 
     /**
@@ -409,6 +394,25 @@ final class FieldService
             'multiselect' => $this->validateMultipleOptions($field, $value),
             default => null,
         };
+    }
+
+    /**
+     * Validate field api_name is unique within block.
+     *
+     * @throws RuntimeException If api_name is taken
+     */
+    private function validateFieldApiName(int $blockId, string $apiName, ?int $excludeFieldId = null): void
+    {
+        $query = FieldModel::where('block_id', $blockId)
+            ->where('api_name', $apiName);
+
+        if ($excludeFieldId) {
+            $query->where('id', '!=', $excludeFieldId);
+        }
+
+        if ($query->exists()) {
+            throw new RuntimeException("Field with api_name '{$apiName}' already exists in this block.");
+        }
     }
 
     /**
@@ -456,7 +460,7 @@ final class FieldService
      */
     private function validateDate(mixed $value, string $fieldLabel): void
     {
-        $date = \DateTime::createFromFormat('Y-m-d', $value);
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
         if (! $date || $date->format('Y-m-d') !== $value) {
             throw new RuntimeException("Field '{$fieldLabel}' must be a valid date (Y-m-d).");
         }
@@ -467,7 +471,7 @@ final class FieldService
      */
     private function validateDateTime(mixed $value, string $fieldLabel): void
     {
-        $datetime = \DateTime::createFromFormat('Y-m-d H:i:s', $value);
+        $datetime = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $value);
         if (! $datetime) {
             throw new RuntimeException("Field '{$fieldLabel}' must be a valid datetime (Y-m-d H:i:s).");
         }
