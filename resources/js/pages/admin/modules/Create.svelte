@@ -7,35 +7,42 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 	import { Switch } from '@/components/ui/switch';
 	import AppLayout from '@/layouts/app/AppSidebarLayout.svelte';
-	import { ArrowLeft, Save, Loader2 } from 'lucide-svelte';
+	import {
+		ArrowLeft,
+		Save,
+		Loader2,
+		Users,
+		Building2,
+		Briefcase,
+		BarChart3,
+		TrendingUp,
+		DollarSign,
+		Target,
+		Calendar,
+		Mail,
+		Phone,
+		Home,
+		Rocket,
+		Settings,
+		Palette,
+		Package,
+		Wrench,
+		Lightbulb,
+		Bell,
+		FileText,
+		type Icon
+	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
+	import type { ComponentType } from 'svelte';
 
 	let name = $state('');
 	let singularName = $state('');
-	let apiName = $state('');
 	let icon = $state('');
 	let description = $state('');
 	let isActive = $state(true);
-	let order = $state(0);
 
 	let saving = $state(false);
 	let errors = $state<Record<string, string>>({});
-
-	// Auto-generate API name from name
-	$effect(() => {
-		if (name && !apiName) {
-			// Convert to snake_case plural
-			apiName = name
-				.toLowerCase()
-				.replace(/\s+/g, '_')
-				.replace(/[^a-z0-9_]/g, '');
-
-			// Make it plural if not already
-			if (!apiName.endsWith('s')) {
-				apiName += 's';
-			}
-		}
-	});
 
 	// Auto-generate singular name from name
 	$effect(() => {
@@ -63,11 +70,9 @@
 				body: JSON.stringify({
 					name,
 					singular_name: singularName,
-					api_name: apiName,
 					icon: icon || null,
 					description: description || null,
-					is_active: isActive,
-					order
+					is_active: isActive
 				})
 			});
 
@@ -94,9 +99,26 @@
 	}
 
 	// Common icons for modules
-	const commonIcons = [
-		'📋', '👥', '🏢', '💼', '📊', '📈', '💰', '🎯', '📅', '✉️',
-		'📞', '🏠', '🚀', '⚙️', '🎨', '📦', '🔧', '💡', '🔔', '📝'
+	const commonIcons: Array<{ name: string; component: ComponentType }> = [
+		{ name: 'FileText', component: FileText },
+		{ name: 'Users', component: Users },
+		{ name: 'Building2', component: Building2 },
+		{ name: 'Briefcase', component: Briefcase },
+		{ name: 'BarChart3', component: BarChart3 },
+		{ name: 'TrendingUp', component: TrendingUp },
+		{ name: 'DollarSign', component: DollarSign },
+		{ name: 'Target', component: Target },
+		{ name: 'Calendar', component: Calendar },
+		{ name: 'Mail', component: Mail },
+		{ name: 'Phone', component: Phone },
+		{ name: 'Home', component: Home },
+		{ name: 'Rocket', component: Rocket },
+		{ name: 'Settings', component: Settings },
+		{ name: 'Palette', component: Palette },
+		{ name: 'Package', component: Package },
+		{ name: 'Wrench', component: Wrench },
+		{ name: 'Lightbulb', component: Lightbulb },
+		{ name: 'Bell', component: Bell }
 	];
 </script>
 
@@ -165,48 +187,29 @@
 							</p>
 						</div>
 
-						<!-- API Name -->
-						<div class="space-y-2">
-							<Label for="api_name">API Name *</Label>
-							<Input
-								id="api_name"
-								bind:value={apiName}
-								placeholder="e.g., projects, leads, invoices"
-								pattern="[a-z][a-z0-9_]*"
-								required
-							/>
-							{#if errors.api_name}
-								<p class="text-sm text-destructive">{errors.api_name[0]}</p>
-							{/if}
-							<p class="text-xs text-muted-foreground">
-								Lowercase, snake_case identifier for API and URLs
-							</p>
-						</div>
-
 						<!-- Icon -->
 						<div class="space-y-2">
 							<Label for="icon">Icon</Label>
-							<div class="flex gap-2">
-								<Input
-									id="icon"
-									bind:value={icon}
-									placeholder="Choose an emoji or leave empty"
-									class="w-24"
-								/>
-								<div class="flex flex-wrap gap-2">
-									{#each commonIcons as emoji}
+							<div class="flex flex-wrap gap-2">
+								{#each commonIcons as iconOption}
+									{#snippet iconBtn()}
+										{@const IconComp = iconOption.component}
 										<button
 											type="button"
-											onclick={() => (icon = emoji)}
-											class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center text-xl"
+											onclick={() => (icon = iconOption.name)}
+											class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center transition-colors"
+											class:bg-accent={icon === iconOption.name}
+											class:text-accent-foreground={icon === iconOption.name}
+											title={iconOption.name}
 										>
-											{emoji}
+											<IconComp class="h-5 w-5" />
 										</button>
-									{/each}
-								</div>
+									{/snippet}
+									{@render iconBtn()}
+								{/each}
 							</div>
 							<p class="text-xs text-muted-foreground">
-								Select an emoji to represent this module
+								Select an icon to represent this module
 							</p>
 						</div>
 
@@ -221,21 +224,6 @@
 							/>
 							<p class="text-xs text-muted-foreground">
 								Help users understand the purpose of this module
-							</p>
-						</div>
-
-						<!-- Display Order -->
-						<div class="space-y-2">
-							<Label for="order">Display Order</Label>
-							<Input
-								id="order"
-								type="number"
-								bind:value={order}
-								min="0"
-								placeholder="0"
-							/>
-							<p class="text-xs text-muted-foreground">
-								Controls the position in navigation (lower numbers appear first)
 							</p>
 						</div>
 

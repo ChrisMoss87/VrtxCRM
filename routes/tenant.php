@@ -101,6 +101,25 @@ Route::middleware([
                 Route::delete('/{id}', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'destroy'])->name('destroy');
                 Route::patch('/{id}/activate', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'activate'])->name('activate');
                 Route::patch('/{id}/deactivate', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'deactivate'])->name('deactivate');
+                Route::post('/{id}/sync-structure', [App\Http\Controllers\Admin\Api\ModuleManagementController::class, 'syncStructure'])->name('sync-structure');
+
+                // Block Management API
+                Route::prefix('{moduleId}/blocks')->name('blocks.')->group(function () {
+                    Route::get('/', [App\Http\Controllers\Admin\Api\BlockManagementController::class, 'index'])->name('index');
+                    Route::post('/', [App\Http\Controllers\Admin\Api\BlockManagementController::class, 'store'])->name('store');
+                    Route::put('/{id}', [App\Http\Controllers\Admin\Api\BlockManagementController::class, 'update'])->name('update');
+                    Route::delete('/{id}', [App\Http\Controllers\Admin\Api\BlockManagementController::class, 'destroy'])->name('destroy');
+                    Route::post('/reorder', [App\Http\Controllers\Admin\Api\BlockManagementController::class, 'reorder'])->name('reorder');
+
+                    // Field Management API
+                    Route::prefix('{blockId}/fields')->name('fields.')->group(function () {
+                        Route::get('/', [App\Http\Controllers\Admin\Api\FieldManagementController::class, 'index'])->name('index');
+                        Route::post('/', [App\Http\Controllers\Admin\Api\FieldManagementController::class, 'store'])->name('store');
+                        Route::put('/{id}', [App\Http\Controllers\Admin\Api\FieldManagementController::class, 'update'])->name('update');
+                        Route::delete('/{id}', [App\Http\Controllers\Admin\Api\FieldManagementController::class, 'destroy'])->name('destroy');
+                        Route::post('/reorder', [App\Http\Controllers\Admin\Api\FieldManagementController::class, 'reorder'])->name('reorder');
+                    });
+                });
             });
         });
 

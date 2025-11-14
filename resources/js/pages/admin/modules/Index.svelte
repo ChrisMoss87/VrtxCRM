@@ -5,7 +5,37 @@
 	import { Badge } from '@/components/ui/badge';
 	import * as DropdownMenu from '@/components/ui/dropdown-menu';
 	import AppLayout from '@/layouts/app/AppSidebarLayout.svelte';
-	import { Plus, MoreVertical, Edit, Trash2, Database, Grid3x3, Power, PowerOff } from 'lucide-svelte';
+	import {
+		Plus,
+		MoreVertical,
+		Edit,
+		Trash2,
+		Database,
+		Grid3x3,
+		Power,
+		PowerOff,
+		Users,
+		Building2,
+		Briefcase,
+		BarChart3,
+		TrendingUp,
+		DollarSign,
+		Target,
+		Calendar,
+		Mail,
+		Phone,
+		Home,
+		Rocket,
+		Settings,
+		Palette,
+		Package,
+		Wrench,
+		Lightbulb,
+		Bell,
+		FileText,
+		type Icon
+	} from 'lucide-svelte';
+	import type { ComponentType } from 'svelte';
 
 	interface Module {
 		id: number;
@@ -27,6 +57,35 @@
 	}
 
 	let { modules }: Props = $props();
+
+	// Icon mapping
+	const iconMap: Record<string, ComponentType> = {
+		FileText,
+		Users,
+		Building2,
+		Briefcase,
+		BarChart3,
+		TrendingUp,
+		DollarSign,
+		Target,
+		Calendar,
+		Mail,
+		Phone,
+		Home,
+		Rocket,
+		Settings,
+		Palette,
+		Package,
+		Wrench,
+		Lightbulb,
+		Bell
+	};
+
+	// Helper to get icon component by name
+	function getIconComponent(iconName: string | null): ComponentType {
+		if (!iconName) return Database;
+		return iconMap[iconName] || Database;
+	}
 
 	function handleCreateNew() {
 		router.visit('/admin/modules/create');
@@ -138,15 +197,13 @@
 						<CardHeader>
 							<div class="flex items-start justify-between">
 								<div class="flex items-center gap-3">
-									{#if module.icon}
-										<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-											<span class="text-xl">{module.icon}</span>
-										</div>
-									{:else}
-										<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-											<Database class="h-5 w-5 text-muted-foreground" />
-										</div>
-									{/if}
+									<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+										{#snippet icon()}
+											{@const IconComponent = getIconComponent(module.icon)}
+											<IconComponent class="h-6 w-6" />
+										{/snippet}
+										{@render icon()}
+									</div>
 									<div>
 										<CardTitle class="text-lg">{module.name}</CardTitle>
 										<CardDescription class="text-xs">{module.api_name}</CardDescription>

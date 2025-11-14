@@ -8,8 +8,12 @@ use App\Domain\Modules\Entities\Module;
 use App\Domain\Modules\Repositories\ModuleRepositoryInterface;
 use App\Domain\Modules\ValueObjects\ModuleSettings;
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Persistence\Eloquent\Models\BlockModel;
+use App\Infrastructure\Persistence\Eloquent\Models\FieldModel;
+use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -290,5 +294,144 @@ final class ModuleManagementController extends Controller
         $this->moduleRepository->save($module);
 
         return response()->json(['message' => 'Module deactivated successfully']);
+    }
+
+    /**
+     * Sync module structure (blocks and fields).
+     * This is a convenience endpoint that handles the full module structure in one request.
+     */
+    public function syncStructure(Request $request, int $id): JsonResponse
+    {
+        $module = ModuleModel::findOrFail($id);
+
+        if ($module->is_system) {
+            return response()->json(['error' => 'Cannot modify system modules'], 403);
+        }
+
+        $validated = $request->validate([
+            'blocks' => ['required', 'array'],
+            'blocks.*.id' => ['nullable', 'integer'],
+            'blocks.*.type' => ['required', 'string', Rule::in(['section', 'tab', 'accordion'])],
+            'blocks.*.label' => ['required', 'string'],
+            'blocks.*.order' => ['required', 'integer'],
+            'blocks.*.settings' => ['nullable', 'array'],
+            'blocks.*.fields' => ['required', 'array'],
+            'blocks.*.fields.*.id' => ['nullable', 'integer'],
+            'blocks.*.fields.*.type' => ['required', 'string'],
+            'blocks.*.fields.*.label' => ['required', 'string'],
+            'blocks.*.fields.*.api_name' => ['required', 'string'],
+            'blocks.*.fields.*.description' => ['nullable', 'string'],
+            'blocks.*.fields.*.help_text' => ['nullable', 'string'],
+            'blocks.*.fields.*.is_required' => ['required', 'boolean'],
+            'blocks.*.fields.*.is_unique' => ['required', 'boolean'],
+            'blocks.*.fields.*.is_searchable' => ['required', 'boolean'],
+            'blocks.*.fields.*.order' => ['required', 'integer'],
+            'blocks.*.fields.*.default_value' => ['nullable'],
+            'blocks.*.fields.*.validation_rules' => ['nullable', 'array'],
+            'blocks.*.fields.*.settings' => ['nullable', 'array'],
+            'blocks.*.fields.*.width' => ['required', 'integer'],
+            'blocks.*.fields.*.options' => ['nullable', 'array'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Get existing block IDs
+            $existingBlockIds = $module->blocks()->pluck('id')->toArray();
+            $submittedBlockIds = collect($validated['blocks'])
+                ->pluck('id')
+                ->filter()
+                ->toArray();
+
+            // Delete blocks that were removed
+            $blocksToDelete = array_diff($existingBlockIds, $submittedBlockIds);
+            if (!empty($blocksToDelete)) {
+                BlockModel::whereIn('id', $blocksToDelete)->delete();
+            }
+
+            // Process each block
+            foreach ($validated['blocks'] as $blockData) {
+                if (isset($blockData['id'])) {
+                    // Update existing block
+                    $block = BlockModel::findOrFail($blockData['id']);
+                    $block->update([
+                        'type' => $blockData['type'],
+                        'label' => $blockData['label'],
+                        'order' => $blockData['order'],
+                        'settings' => $blockData['settings'] ?? [],
+                    ]);
+                } else {
+                    // Create new block
+                    $block = BlockModel::create([
+                        'module_id' => $id,
+                        'type' => $blockData['type'],
+                        'label' => $blockData['label'],
+                        'order' => $blockData['order'],
+                        'settings' => $blockData['settings'] ?? [],
+                    ]);
+                }
+
+                // Get existing field IDs for this block
+                $existingFieldIds = $block->fields()->pluck('id')->toArray();
+                $submittedFieldIds = collect($blockData['fields'])
+                    ->pluck('id')
+                    ->filter()
+                    ->toArray();
+
+                // Delete fields that were removed
+                $fieldsToDelete = array_diff($existingFieldIds, $submittedFieldIds);
+                if (!empty($fieldsToDelete)) {
+                    FieldModel::whereIn('id', $fieldsToDelete)->delete();
+                }
+
+                // Process each field
+                foreach ($blockData['fields'] as $fieldData) {
+                    if (isset($fieldData['id'])) {
+                        // Update existing field
+                        $field = FieldModel::findOrFail($fieldData['id']);
+                        $field->update([
+                            'type' => $fieldData['type'],
+                            'api_name' => $fieldData['api_name'],
+                            'label' => $fieldData['label'],
+                            'description' => $fieldData['description'],
+                            'help_text' => $fieldData['help_text'],
+                            'is_required' => $fieldData['is_required'],
+                            'is_unique' => $fieldData['is_unique'],
+                            'is_searchable' => $fieldData['is_searchable'],
+                            'order' => $fieldData['order'],
+                            'default_value' => $fieldData['default_value'],
+                            'validation_rules' => $fieldData['validation_rules'] ?? [],
+                            'settings' => $fieldData['settings'] ?? [],
+                            'width' => $fieldData['width'],
+                        ]);
+                    } else {
+                        // Create new field
+                        FieldModel::create([
+                            'block_id' => $block->id,
+                            'type' => $fieldData['type'],
+                            'api_name' => $fieldData['api_name'],
+                            'label' => $fieldData['label'],
+                            'description' => $fieldData['description'],
+                            'help_text' => $fieldData['help_text'],
+                            'is_required' => $fieldData['is_required'],
+                            'is_unique' => $fieldData['is_unique'],
+                            'is_searchable' => $fieldData['is_searchable'],
+                            'order' => $fieldData['order'],
+                            'default_value' => $fieldData['default_value'],
+                            'validation_rules' => $fieldData['validation_rules'] ?? [],
+                            'settings' => $fieldData['settings'] ?? [],
+                            'width' => $fieldData['width'],
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json(['message' => 'Module structure synced successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }
