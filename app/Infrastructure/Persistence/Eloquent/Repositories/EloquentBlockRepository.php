@@ -5,23 +5,64 @@ declare(strict_types=1);
 namespace App\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Domain\Modules\Entities\Block;
+use App\Domain\Modules\Repositories\BlockRepositoryInterface;
 use App\Domain\Modules\ValueObjects\BlockType;
 use App\Infrastructure\Persistence\Eloquent\Models\BlockModel;
 use DateTimeImmutable;
 
-final class EloquentBlockRepository
+final class EloquentBlockRepository implements BlockRepositoryInterface
 {
+    public function findById(int $id): ?Block
+    {
+        $model = BlockModel::with(['fields.options'])->find($id);
+
+        return $model ? $this->toDomain($model) : null;
+    }
+
+    public function findByModuleId(int $moduleId): array
+    {
+        $models = BlockModel::where('module_id', $moduleId)
+            ->with(['fields.options'])
+            ->orderBy('order')
+            ->get();
+
+        return array_map(fn (BlockModel $model) => $this->toDomain($model), $models->all());
+    }
+
+    public function save(Block $block): Block
+    {
+        $data = [
+            'module_id' => $block->moduleId(),
+            'type' => $block->type()->value,
+            'label' => $block->label(),
+            'order' => $block->order(),
+            'settings' => $block->settings(),
+        ];
+
+        if ($block->id()) {
+            $model = BlockModel::findOrFail($block->id());
+            $model->update($data);
+        } else {
+            $model = BlockModel::create($data);
+        }
+
+        return $this->toDomain($model->fresh(['fields.options']));
+    }
+
+    public function delete(int $id): bool
+    {
+        return BlockModel::destroy($id) > 0;
+    }
+
     public function toDomain(BlockModel $model): Block
     {
         $block = new Block(
             id: $model->id,
             moduleId: $model->module_id,
-            name: $model->name,
+            label: $model->label,
             type: BlockType::from($model->type),
             order: $model->order,
-            columns: $model->columns,
-            isCollapsible: $model->is_collapsible,
-            isCollapsedByDefault: $model->is_collapsed_by_default,
+            settings: $model->settings ?? [],
             createdAt: new DateTimeImmutable($model->created_at->toDateTimeString()),
             updatedAt: $model->updated_at ? new DateTimeImmutable($model->updated_at->toDateTimeString()) : null,
         );

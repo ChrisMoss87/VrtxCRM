@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Infrastructure\Persistence\Eloquent\Models\BlockModel;
 use App\Infrastructure\Persistence\Eloquent\Models\FieldModel;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -345,7 +346,7 @@ final class ModuleManagementController extends Controller
 
             // Delete blocks that were removed
             $blocksToDelete = array_diff($existingBlockIds, $submittedBlockIds);
-            if (!empty($blocksToDelete)) {
+            if (! empty($blocksToDelete)) {
                 BlockModel::whereIn('id', $blocksToDelete)->delete();
             }
 
@@ -380,7 +381,7 @@ final class ModuleManagementController extends Controller
 
                 // Delete fields that were removed
                 $fieldsToDelete = array_diff($existingFieldIds, $submittedFieldIds);
-                if (!empty($fieldsToDelete)) {
+                if (! empty($fieldsToDelete)) {
                     FieldModel::whereIn('id', $fieldsToDelete)->delete();
                 }
 
@@ -429,8 +430,9 @@ final class ModuleManagementController extends Controller
             DB::commit();
 
             return response()->json(['message' => 'Module structure synced successfully']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
+
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }

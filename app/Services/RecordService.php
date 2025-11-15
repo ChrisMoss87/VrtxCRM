@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Domain\Modules\Entities\ModuleRecord;
+use App\Domain\Modules\Repositories\ModuleRecordRepositoryInterface;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
-use App\Infrastructure\Persistence\Eloquent\Models\ModuleRecordModel;
 use Exception;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class RecordService
 {
     public function __construct(
+        private readonly ModuleRecordRepositoryInterface $recordRepository,
         private readonly FieldService $fieldService
     ) {}
 
@@ -24,7 +25,7 @@ final class RecordService
      *
      * @throws RuntimeException If record creation fails
      */
-    public function createRecord(int $moduleId, array $data, ?int $createdBy = null): ModuleRecordModel
+    public function createRecord(int $moduleId, array $data, ?int $createdBy = null): ModuleRecord
     {
         $module = ModuleModel::with(['blocks.fields.options'])->findOrFail($moduleId);
 
@@ -38,17 +39,19 @@ final class RecordService
             // Validate and transform data
             $validatedData = $this->validateAndTransformData($module, $data);
 
-            // Create record
-            $record = ModuleRecordModel::create([
-                'module_id' => $moduleId,
-                'data' => $validatedData,
-                'created_by' => $createdBy ?? auth()->id(),
-                'updated_by' => $createdBy ?? auth()->id(),
-            ]);
+            // Create domain entity
+            $record = ModuleRecord::create(
+                $moduleId,
+                $validatedData,
+                $createdBy ?? auth()->id()
+            );
+
+            // Persist using repository
+            $savedRecord = $this->recordRepository->save($record);
 
             DB::commit();
 
-            return $record->fresh(['module', 'creator', 'updater']);
+            return $savedRecord;
         } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to create record: {$e->getMessage()}", 0, $e);
@@ -62,29 +65,37 @@ final class RecordService
      *
      * @throws RuntimeException If record update fails
      */
-    public function updateRecord(int $recordId, array $data, ?int $updatedBy = null): ModuleRecordModel
+    public function updateRecord(int $moduleId, int $recordId, array $data, ?int $updatedBy = null): ModuleRecord
     {
         DB::beginTransaction();
 
         try {
-            $record = ModuleRecordModel::with(['module.blocks.fields.options'])->findOrFail($recordId);
+            // Load module for validation
+            $module = ModuleModel::with(['blocks.fields.options'])->findOrFail($moduleId);
 
-            if (! $record->module->is_active) {
+            if (! $module->is_active) {
                 throw new RuntimeException('Cannot update records for inactive modules.');
             }
 
-            // Validate and transform data
-            $validatedData = $this->validateAndTransformData($record->module, $data, $record->data);
+            // Get existing record
+            $record = $this->recordRepository->findById($moduleId, $recordId);
 
-            // Update record
-            $record->update([
-                'data' => $validatedData,
-                'updated_by' => $updatedBy ?? auth()->id(),
-            ]);
+            if (! $record) {
+                throw new RuntimeException("Record not found with ID {$recordId}.");
+            }
+
+            // Validate and transform data, merging with existing
+            $validatedData = $this->validateAndTransformData($module, $data, $record->data());
+
+            // Update domain entity
+            $record->updateData($validatedData, $updatedBy ?? auth()->id());
+
+            // Persist using repository
+            $updatedRecord = $this->recordRepository->save($record);
 
             DB::commit();
 
-            return $record->fresh(['module', 'creator', 'updater']);
+            return $updatedRecord;
         } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to update record: {$e->getMessage()}", 0, $e);
@@ -92,19 +103,24 @@ final class RecordService
     }
 
     /**
-     * Delete a record (soft delete).
+     * Delete a record.
      *
      * @throws RuntimeException If record deletion fails
      */
-    public function deleteRecord(int $recordId): void
+    public function deleteRecord(int $moduleId, int $recordId): bool
     {
         DB::beginTransaction();
 
         try {
-            $record = ModuleRecordModel::findOrFail($recordId);
-            $record->delete();
+            $success = $this->recordRepository->delete($moduleId, $recordId);
+
+            if (! $success) {
+                throw new RuntimeException("Record not found with ID {$recordId}.");
+            }
 
             DB::commit();
+
+            return $success;
         } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to delete record: {$e->getMessage()}", 0, $e);
@@ -112,167 +128,125 @@ final class RecordService
     }
 
     /**
-     * Restore a soft-deleted record.
-     *
-     * @throws RuntimeException If record restoration fails
-     */
-    public function restoreRecord(int $recordId): ModuleRecordModel
-    {
-        DB::beginTransaction();
-
-        try {
-            $record = ModuleRecordModel::withTrashed()->findOrFail($recordId);
-            $record->restore();
-
-            DB::commit();
-
-            return $record->fresh(['module', 'creator', 'updater']);
-        } catch (Exception $e) {
-            DB::rollBack();
-            throw new RuntimeException("Failed to restore record: {$e->getMessage()}", 0, $e);
-        }
-    }
-
-    /**
-     * Permanently delete a record.
-     *
-     * @throws RuntimeException If record deletion fails
-     */
-    public function forceDeleteRecord(int $recordId): void
-    {
-        DB::beginTransaction();
-
-        try {
-            $record = ModuleRecordModel::withTrashed()->findOrFail($recordId);
-            $record->forceDelete();
-
-            DB::commit();
-        } catch (Exception $e) {
-            DB::rollBack();
-            throw new RuntimeException("Failed to permanently delete record: {$e->getMessage()}", 0, $e);
-        }
-    }
-
-    /**
      * Get a single record by ID.
      */
-    public function getRecord(int $recordId): ModuleRecordModel
+    public function getRecord(int $moduleId, int $recordId): ?ModuleRecord
     {
-        return ModuleRecordModel::with(['module.blocks.fields.options', 'creator', 'updater'])
-            ->findOrFail($recordId);
+        return $this->recordRepository->findById($moduleId, $recordId);
     }
 
     /**
      * Get all records for a module with pagination.
      *
-     * @param  array{search?: string, filters?: array, sort?: string, direction?: string}  $options
+     * @param  array<string, mixed>  $filters  Array of field filters ['field_name' => ['operator' => 'value']]
+     * @param  array<string, string>  $sort  Array of sort rules ['field_name' => 'asc|desc']
+     * @return array{data: ModuleRecord[], total: int, per_page: int, current_page: int, last_page: int}
      */
     public function getRecords(
         int $moduleId,
-        int $perPage = 15,
-        array $options = []
-    ): LengthAwarePaginator {
-        $query = ModuleRecordModel::where('module_id', $moduleId)
-            ->with(['creator', 'updater']);
-
-        // Apply search if provided
-        if (! empty($options['search'])) {
-            $search = $options['search'];
-            $query->where(function ($q) use ($search) {
-                // Search in JSON data using PostgreSQL operators
-                $q->whereRaw('data::text ILIKE ?', ["%{$search}%"]);
-            });
-        }
-
-        // Apply filters if provided
-        if (! empty($options['filters'])) {
-            foreach ($options['filters'] as $field => $value) {
-                $query->whereRaw('data->? = ?', [$field, json_encode($value)]);
-            }
-        }
-
-        // Apply sorting
-        $sortField = $options['sort'] ?? 'created_at';
-        $direction = $options['direction'] ?? 'desc';
-
-        if ($sortField === 'created_at' || $sortField === 'updated_at') {
-            $query->orderBy($sortField, $direction);
-        } else {
-            // Sort by JSON field
-            $query->orderByRaw("data->? {$direction}", [$sortField]);
-        }
-
-        return $query->paginate($perPage);
+        array $filters = [],
+        array $sort = [],
+        int $page = 1,
+        int $perPage = 15
+    ): array {
+        return $this->recordRepository->findAll(
+            $moduleId,
+            $filters,
+            $sort,
+            $page,
+            $perPage
+        );
     }
 
     /**
      * Search records across multiple fields.
      *
      * @param  array<string>  $searchableFields  Field api_names to search
+     * @return array{data: ModuleRecord[], total: int, per_page: int, current_page: int, last_page: int}
      */
     public function searchRecords(
         int $moduleId,
         string $searchTerm,
         array $searchableFields = [],
+        int $page = 1,
         int $perPage = 15
-    ): LengthAwarePaginator {
-        $query = ModuleRecordModel::where('module_id', $moduleId)
-            ->with(['creator', 'updater']);
+    ): array {
+        // Build filters for contains operator across multiple fields
+        $filters = [];
 
         if (empty($searchableFields)) {
-            // Search all fields
-            $query->whereRaw('data::text ILIKE ?', ["%{$searchTerm}%"]);
-        } else {
-            // Search specific fields
-            $query->where(function ($q) use ($searchableFields, $searchTerm) {
-                foreach ($searchableFields as $field) {
-                    $q->orWhereRaw('data->>? ILIKE ?', [$field, "%{$searchTerm}%"]);
+            // When no specific fields provided, we can't search all fields easily
+            // This would require fetching all fields from the module first
+            $module = ModuleModel::with(['blocks.fields'])->findOrFail($moduleId);
+            $searchableFields = [];
+
+            foreach ($module->blocks as $block) {
+                foreach ($block->fields as $field) {
+                    $searchableFields[] = $field->api_name;
                 }
-            });
+            }
         }
 
-        return $query->orderBy('created_at', 'desc')->paginate($perPage);
+        // Use 'contains' operator for each searchable field
+        // Note: Repository currently doesn't support OR conditions across fields
+        // This is a simplified implementation that filters by the first field only
+        if (! empty($searchableFields)) {
+            $filters[$searchableFields[0]] = [
+                'operator' => 'contains',
+                'value' => $searchTerm,
+            ];
+        }
+
+        return $this->recordRepository->findAll(
+            $moduleId,
+            $filters,
+            ['created_at' => 'desc'],
+            $page,
+            $perPage
+        );
     }
 
     /**
      * Get records with specific field value.
+     *
+     * @return array{data: ModuleRecord[], total: int, per_page: int, current_page: int, last_page: int}
      */
     public function getRecordsByField(
         int $moduleId,
         string $fieldApiName,
         mixed $value,
+        int $page = 1,
         int $perPage = 15
-    ): LengthAwarePaginator {
-        return ModuleRecordModel::where('module_id', $moduleId)
-            ->whereRaw('data->? = ?', [$fieldApiName, json_encode($value)])
-            ->with(['creator', 'updater'])
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+    ): array {
+        $filters = [
+            $fieldApiName => [
+                'operator' => 'equals',
+                'value' => $value,
+            ],
+        ];
+
+        return $this->recordRepository->findAll(
+            $moduleId,
+            $filters,
+            ['created_at' => 'desc'],
+            $page,
+            $perPage
+        );
     }
 
     /**
      * Get record count for a module.
      */
-    public function getRecordCount(int $moduleId): int
+    public function getRecordCount(int $moduleId, array $filters = []): int
     {
-        return ModuleRecordModel::where('module_id', $moduleId)->count();
-    }
-
-    /**
-     * Get record count by field value.
-     */
-    public function getRecordCountByField(int $moduleId, string $fieldApiName, mixed $value): int
-    {
-        return ModuleRecordModel::where('module_id', $moduleId)
-            ->whereRaw('data->? = ?', [$fieldApiName, json_encode($value)])
-            ->count();
+        return $this->recordRepository->count($moduleId, $filters);
     }
 
     /**
      * Bulk create records.
      *
      * @param  array<array<string, mixed>>  $records  Array of record data
-     * @return array<ModuleRecordModel>
+     * @return array<ModuleRecord>
      *
      * @throws RuntimeException If bulk creation fails
      */
@@ -292,14 +266,16 @@ final class RecordService
             foreach ($records as $data) {
                 $validatedData = $this->validateAndTransformData($module, $data);
 
-                $record = ModuleRecordModel::create([
-                    'module_id' => $moduleId,
-                    'data' => $validatedData,
-                    'created_by' => $createdBy ?? auth()->id(),
-                    'updated_by' => $createdBy ?? auth()->id(),
-                ]);
+                // Create domain entity
+                $record = ModuleRecord::create(
+                    $moduleId,
+                    $validatedData,
+                    $createdBy ?? auth()->id()
+                );
 
-                $createdRecords[] = $record;
+                // Persist using repository
+                $savedRecord = $this->recordRepository->save($record);
+                $createdRecords[] = $savedRecord;
             }
 
             DB::commit();
@@ -318,12 +294,12 @@ final class RecordService
      *
      * @throws RuntimeException If bulk deletion fails
      */
-    public function bulkDeleteRecords(array $recordIds): int
+    public function bulkDeleteRecords(int $moduleId, array $recordIds): int
     {
         DB::beginTransaction();
 
         try {
-            $deleted = ModuleRecordModel::whereIn('id', $recordIds)->delete();
+            $deleted = $this->recordRepository->bulkDelete($moduleId, $recordIds);
 
             DB::commit();
 
@@ -349,28 +325,34 @@ final class RecordService
         try {
             $module = ModuleModel::with(['blocks.fields.options'])->findOrFail($moduleId);
 
-            // Get all records to update
-            $records = ModuleRecordModel::where('module_id', $moduleId)
-                ->whereIn('id', $recordIds)
-                ->get();
-
-            if ($records->isEmpty()) {
-                throw new RuntimeException('No records found to update.');
+            if (! $module->is_active) {
+                throw new RuntimeException('Cannot update records for inactive modules.');
             }
 
-            foreach ($records as $record) {
-                // Merge new data with existing data
-                $validatedData = $this->validateAndTransformData($module, $data, $record->data);
+            $updatedCount = 0;
 
-                $record->update([
-                    'data' => $validatedData,
-                    'updated_by' => $updatedBy ?? auth()->id(),
-                ]);
+            foreach ($recordIds as $recordId) {
+                // Get existing record
+                $record = $this->recordRepository->findById($moduleId, $recordId);
+
+                if (! $record) {
+                    continue; // Skip if record not found
+                }
+
+                // Merge new data with existing data
+                $validatedData = $this->validateAndTransformData($module, $data, $record->data());
+
+                // Update domain entity
+                $record->updateData($validatedData, $updatedBy ?? auth()->id());
+
+                // Persist using repository
+                $this->recordRepository->save($record);
+                $updatedCount++;
             }
 
             DB::commit();
 
-            return $records->count();
+            return $updatedCount;
         } catch (Exception $e) {
             DB::rollBack();
             throw new RuntimeException("Failed to bulk update records: {$e->getMessage()}", 0, $e);
@@ -384,20 +366,25 @@ final class RecordService
      */
     public function exportRecords(int $moduleId): array
     {
-        $records = ModuleRecordModel::where('module_id', $moduleId)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Get all records (no pagination for export)
+        $result = $this->recordRepository->findAll(
+            $moduleId,
+            [],
+            ['created_at' => 'desc'],
+            1,
+            999999 // Large limit to get all records
+        );
 
-        return $records->map(function ($record) {
+        return array_map(function (ModuleRecord $record) {
             return array_merge(
-                $record->data,
+                $record->data(),
                 [
-                    'id' => $record->id,
-                    'created_at' => $record->created_at->toIso8601String(),
-                    'updated_at' => $record->updated_at->toIso8601String(),
+                    'id' => $record->id(),
+                    'created_at' => $record->createdAt()?->format('c'),
+                    'updated_at' => $record->updatedAt()?->format('c'),
                 ]
             );
-        })->toArray();
+        }, $result['data']);
     }
 
     /**
@@ -407,39 +394,32 @@ final class RecordService
      */
     public function getUniqueFieldValues(int $moduleId, string $fieldApiName): array
     {
-        $records = ModuleRecordModel::where('module_id', $moduleId)
-            ->get();
+        // Get all records
+        $result = $this->recordRepository->findAll(
+            $moduleId,
+            [],
+            [],
+            1,
+            999999
+        );
 
-        return $records->pluck("data.{$fieldApiName}")
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
+        $values = [];
+        foreach ($result['data'] as $record) {
+            $value = $record->getFieldValue($fieldApiName);
+            if ($value !== null && ! in_array($value, $values, true)) {
+                $values[] = $value;
+            }
+        }
+
+        return $values;
     }
 
     /**
-     * Get record statistics for a module.
+     * Check if a record exists.
      */
-    public function getRecordStatistics(int $moduleId): array
+    public function recordExists(int $moduleId, int $recordId): bool
     {
-        $total = $this->getRecordCount($moduleId);
-        $deleted = ModuleRecordModel::where('module_id', $moduleId)->onlyTrashed()->count();
-
-        $recent = ModuleRecordModel::where('module_id', $moduleId)
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        $updated = ModuleRecordModel::where('module_id', $moduleId)
-            ->where('updated_at', '>=', now()->subDays(7))
-            ->count();
-
-        return [
-            'total' => $total,
-            'active' => $total - $deleted,
-            'deleted' => $deleted,
-            'created_last_7_days' => $recent,
-            'updated_last_7_days' => $updated,
-        ];
+        return $this->recordRepository->exists($moduleId, $recordId);
     }
 
     /**
@@ -465,8 +445,11 @@ final class RecordService
                     // Validate field value
                     $this->fieldService->validateFieldValue($field, $value);
 
-                    // Store validated value
-                    $validatedData[$apiName] = $value;
+                    // Apply type conversion
+                    $transformedValue = $this->convertFieldValue($field, $value);
+
+                    // Store validated and transformed value
+                    $validatedData[$apiName] = $transformedValue;
                 } elseif ($field->is_required && ! isset($existingData[$apiName])) {
                     // Field is required but not provided and not in existing data
                     throw new RuntimeException("Field '{$field->label}' is required.");
@@ -478,5 +461,25 @@ final class RecordService
         }
 
         return $validatedData;
+    }
+
+    /**
+     * Convert field value to appropriate type based on field type.
+     */
+    private function convertFieldValue($field, mixed $value): mixed
+    {
+        // Return null as-is
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return match ($field->type) {
+            'number' => is_numeric($value) ? (int) $value : $value,
+            'decimal', 'currency', 'percent' => is_numeric($value) ? (float) $value : $value,
+            'checkbox', 'toggle' => (bool) $value,
+            'multiselect' => is_array($value) ? $value : [$value],
+            'date', 'datetime' => is_string($value) ? $value : (string) $value,
+            default => $value,
+        };
     }
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { router } from '@inertiajs/svelte';
+	import { router, useForm } from '@inertiajs/svelte';
 	import { Button } from '@/components/ui/button';
 	import { Input } from '@/components/ui/input';
 	import { Label } from '@/components/ui/label';
@@ -15,8 +15,6 @@
 		Plus,
 		Trash2,
 		GripVertical,
-		Edit,
-		Settings,
 		Users,
 		Building2,
 		Briefcase,
@@ -29,16 +27,18 @@
 		Phone,
 		Home,
 		Rocket,
+		Settings,
 		Palette,
 		Package,
 		Wrench,
 		Lightbulb,
 		Bell,
-		FileText,
-		type Icon
+		FileText
 	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { ComponentType } from 'svelte';
+	import { dndzone } from 'svelte-dnd-action';
+	import type { DndEvent } from 'svelte-dnd-action';
 
 	interface FieldOption {
 		id?: number;
@@ -96,16 +96,18 @@
 
 	let { module, fieldTypes }: Props = $props();
 
-	// Local state for editing
-	let name = $state(module.name);
-	let singularName = $state(module.singular_name);
-	let icon = $state(module.icon || '');
-	let description = $state(module.description || '');
-	let isActive = $state(module.is_active);
-	let blocks = $state<Block[]>(structuredClone(module.blocks));
+	// Basic Info Form
+	const basicForm = useForm({
+		name: module.name,
+		singular_name: module.singular_name,
+		icon: module.icon || '',
+		description: module.description || '',
+		is_active: module.is_active
+	});
 
-	let saving = $state(false);
-	let errors = $state<Record<string, string>>({});
+	// Fields & Blocks state (simple reactivity)
+	let blocks = $state<Block[]>(JSON.parse(JSON.stringify(module.blocks)));
+	let savingStructure = $state(false);
 	let activeTab = $state('basic');
 
 	// Common icons for modules
@@ -143,9 +145,6 @@
 	}
 
 	async function handleSaveBasic() {
-		errors = {};
-		saving = true;
-
 		try {
 			const response = await fetch(`/api/admin/modules/${module.id}`, {
 				method: 'PUT',
@@ -154,20 +153,16 @@
 					'X-CSRF-TOKEN':
 						document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
 				},
-				body: JSON.stringify({
-					name,
-					singular_name: singularName,
-					icon: icon || null,
-					description: description || null,
-					is_active: isActive
-				})
+				body: JSON.stringify(basicForm.data)
 			});
 
 			const data = await response.json();
 
 			if (!response.ok) {
 				if (data.errors) {
-					errors = data.errors;
+					Object.keys(data.errors).forEach((key) => {
+						basicForm.setError(key, data.errors[key][0] || data.errors[key]);
+					});
 					toast.error('Validation failed. Please check the form.');
 				} else {
 					toast.error(data.error || 'Failed to update module');
@@ -176,12 +171,10 @@
 			}
 
 			toast.success('Module updated successfully!');
-			router.reload();
+			router.reload({ only: ['module'] });
 		} catch (error) {
 			console.error('Failed to update module:', error);
 			toast.error('An error occurred. Please try again.');
-		} finally {
-			saving = false;
 		}
 	}
 
@@ -225,22 +218,16 @@
 				options: []
 			}
 		];
-		blocks = [...blocks];
+		blocks = [...blocks]; // Trigger reactivity
 	}
 
 	function removeField(blockIndex: number, fieldIndex: number) {
 		if (confirm('Are you sure you want to delete this field?')) {
 			blocks[blockIndex].fields = blocks[blockIndex].fields.filter((_, i) => i !== fieldIndex);
-			blocks = [...blocks];
+			blocks = [...blocks]; // Trigger reactivity
 		}
 	}
 
-	// Helper to check if field type requires options
-	function requiresOptions(fieldType: string): boolean {
-		return ['select', 'multiselect', 'radio'].includes(fieldType);
-	}
-
-	// Auto-generate API name from label
 	function generateApiName(label: string): string {
 		return label
 			.toLowerCase()
@@ -248,15 +235,29 @@
 			.replace(/[^a-z0-9_]/g, '');
 	}
 
-	async function handleSaveFieldsAndBlocks() {
-		errors = {};
-		saving = true;
+	// Drag and drop handlers for blocks
+	function handleBlocksSort(e: CustomEvent<DndEvent<Block>>) {
+		blocks = e.detail.items;
+		// Update order property
+		blocks.forEach((block, index) => {
+			block.order = index;
+		});
+	}
+
+	// Drag and drop handlers for fields
+	function handleFieldsSort(blockIndex: number, e: CustomEvent<DndEvent<Field>>) {
+		blocks[blockIndex].fields = e.detail.items;
+		// Update order property
+		blocks[blockIndex].fields.forEach((field, index) => {
+			field.order = index;
+		});
+		blocks = [...blocks]; // Trigger reactivity
+	}
+
+	async function handleSaveStructure() {
+		savingStructure = true;
 
 		try {
-			// For now, we'll sync blocks and fields with the backend
-			// This is a simplified approach - in production you'd want to handle
-			// individual creates/updates/deletes for better UX
-
 			const response = await fetch(`/api/admin/modules/${module.id}/sync-structure`, {
 				method: 'POST',
 				headers: {
@@ -275,12 +276,12 @@
 			}
 
 			toast.success('Fields and blocks saved successfully!');
-			router.reload();
+			router.reload({ only: ['module'] });
 		} catch (error) {
-			console.error('Failed to save fields and blocks:', error);
+			console.error('Failed to save structure:', error);
 			toast.error('An error occurred. Please try again.');
 		} finally {
-			saving = false;
+			savingStructure = false;
 		}
 	}
 </script>
@@ -314,7 +315,9 @@
 				</div>
 			</div>
 			{#if module.is_system}
-				<div class="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+				<div
+					class="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+				>
 					System Module
 				</div>
 			{/if}
@@ -348,17 +351,14 @@
 									<Label for="name">Module Name *</Label>
 									<Input
 										id="name"
-										bind:value={name}
+										bind:value={basicForm.data.name}
 										placeholder="e.g., Projects, Leads, Invoices"
 										required
 										disabled={module.is_system}
 									/>
-									{#if errors.name}
-										<p class="text-sm text-destructive">{errors.name[0]}</p>
+									{#if basicForm.errors.name}
+										<p class="text-sm text-destructive">{basicForm.errors.name}</p>
 									{/if}
-									<p class="text-xs text-muted-foreground">
-										The plural name displayed in navigation and lists
-									</p>
 								</div>
 
 								<!-- Singular Name -->
@@ -366,17 +366,14 @@
 									<Label for="singular_name">Singular Name *</Label>
 									<Input
 										id="singular_name"
-										bind:value={singularName}
+										bind:value={basicForm.data.singular_name}
 										placeholder="e.g., Project, Lead, Invoice"
 										required
 										disabled={module.is_system}
 									/>
-									{#if errors.singular_name}
-										<p class="text-sm text-destructive">{errors.singular_name[0]}</p>
+									{#if basicForm.errors.singular_name}
+										<p class="text-sm text-destructive">{basicForm.errors.singular_name}</p>
 									{/if}
-									<p class="text-xs text-muted-foreground">
-										Used for single records (e.g., "Create Project")
-									</p>
 								</div>
 
 								<!-- API Name (Read-only) -->
@@ -390,17 +387,17 @@
 
 								<!-- Icon -->
 								<div class="space-y-2">
-									<Label for="icon">Icon</Label>
+									<Label>Icon</Label>
 									<div class="flex flex-wrap gap-2">
 										{#each commonIcons as iconOption}
 											{#snippet iconBtn()}
 												{@const IconComp = iconOption.component}
 												<button
 													type="button"
-													onclick={() => (icon = iconOption.name)}
+													onclick={() => (basicForm.data.icon = iconOption.name)}
 													class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center transition-colors"
-													class:bg-accent={icon === iconOption.name}
-													class:text-accent-foreground={icon === iconOption.name}
+													class:bg-accent={basicForm.data.icon === iconOption.name}
+													class:text-accent-foreground={basicForm.data.icon === iconOption.name}
 													title={iconOption.name}
 												>
 													<IconComp class="h-5 w-5" />
@@ -409,9 +406,6 @@
 											{@render iconBtn()}
 										{/each}
 									</div>
-									<p class="text-xs text-muted-foreground">
-										Select an icon to represent this module
-									</p>
 								</div>
 
 								<!-- Description -->
@@ -419,13 +413,10 @@
 									<Label for="description">Description</Label>
 									<Textarea
 										id="description"
-										bind:value={description}
+										bind:value={basicForm.data.description}
 										placeholder="What is this module used for?"
 										rows={3}
 									/>
-									<p class="text-xs text-muted-foreground">
-										Help users understand the purpose of this module
-									</p>
 								</div>
 
 								<!-- Active Status -->
@@ -438,15 +429,15 @@
 											Inactive modules are hidden from users
 										</p>
 									</div>
-									<Switch id="is_active" bind:checked={isActive} />
+									<Switch id="is_active" bind:checked={basicForm.data.is_active} />
 								</div>
 							</CardContent>
 						</Card>
 
 						<!-- Actions -->
 						<div class="flex items-center gap-4">
-							<Button type="submit" disabled={saving || module.is_system}>
-								{#if saving}
+							<Button type="submit" disabled={basicForm.processing || module.is_system}>
+								{#if basicForm.processing}
 									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 									Saving...
 								{:else}
@@ -454,7 +445,12 @@
 									Save Changes
 								{/if}
 							</Button>
-							<Button type="button" variant="outline" onclick={handleCancel} disabled={saving}>
+							<Button
+								type="button"
+								variant="outline"
+								onclick={handleCancel}
+								disabled={basicForm.processing}
+							>
 								Cancel
 							</Button>
 						</div>
@@ -468,7 +464,9 @@
 					<!-- Blocks List -->
 					{#if blocks.length === 0}
 						<Card class="border-dashed">
-							<CardContent class="flex flex-col items-center justify-center py-12 text-center">
+							<CardContent
+								class="flex flex-col items-center justify-center py-12 text-center"
+							>
 								<p class="text-sm text-muted-foreground mb-4">
 									No blocks defined yet. Add a block to start organizing your fields.
 								</p>
@@ -479,14 +477,26 @@
 							</CardContent>
 						</Card>
 					{:else}
-						<div class="space-y-4">
-							{#each blocks as block, blockIndex (blockIndex)}
-								<Card>
+						<div
+							class="space-y-4"
+							use:dndzone={{
+								items: blocks,
+								dragDisabled: module.is_system,
+								dropTargetStyle: {},
+								type: 'blocks'
+							}}
+							onconsider={handleBlocksSort}
+							onfinalize={handleBlocksSort}
+						>
+							{#each blocks as block, blockIndex (block.id || blockIndex)}
+								<Card data-testid="block-item">
 									<CardHeader>
 										<div class="flex items-center justify-between">
-											<div class="flex items-center gap-3">
-												<GripVertical class="h-5 w-5 text-muted-foreground cursor-move" />
-												<div>
+											<div class="flex items-center gap-3 flex-1">
+												<GripVertical
+													class="h-5 w-5 text-muted-foreground cursor-move"
+												/>
+												<div class="flex-1">
 													<Input
 														bind:value={block.label}
 														class="font-semibold text-lg h-auto border-0 px-0 focus-visible:ring-0"
@@ -494,7 +504,9 @@
 														disabled={module.is_system}
 													/>
 													<p class="text-xs text-muted-foreground mt-1">
-														{block.fields.length} field{block.fields.length !== 1 ? 's' : ''}
+														{block.fields.length} field{block.fields.length !== 1
+															? 's'
+															: ''}
 													</p>
 												</div>
 											</div>
@@ -504,6 +516,7 @@
 													size="sm"
 													onclick={() => addField(blockIndex)}
 													disabled={module.is_system}
+													data-testid="add-field-button"
 												>
 													<Plus class="h-4 w-4 mr-1" />
 													Add Field
@@ -513,6 +526,7 @@
 													size="icon"
 													onclick={() => removeBlock(blockIndex)}
 													disabled={module.is_system}
+													data-testid="delete-block-button"
 												>
 													<Trash2 class="h-4 w-4 text-destructive" />
 												</Button>
@@ -522,9 +536,19 @@
 
 									{#if block.fields.length > 0}
 										<CardContent>
-											<div class="space-y-3">
-												{#each block.fields as field, fieldIndex (fieldIndex)}
-													<div class="flex items-start gap-3 p-4 border rounded-lg">
+											<div
+												class="space-y-3"
+												use:dndzone={{
+													items: block.fields,
+													dragDisabled: module.is_system,
+													dropTargetStyle: {},
+													type: `fields-${blockIndex}`
+												}}
+												onconsider={(e) => handleFieldsSort(blockIndex, e)}
+												onfinalize={(e) => handleFieldsSort(blockIndex, e)}
+											>
+												{#each block.fields as field, fieldIndex (field.id || fieldIndex)}
+													<div class="flex items-start gap-3 p-4 border rounded-lg" data-testid="field-item">
 														<GripVertical
 															class="h-5 w-5 text-muted-foreground cursor-move mt-2"
 														/>
@@ -536,7 +560,7 @@
 																	bind:value={field.label}
 																	placeholder="Field Label"
 																	disabled={module.is_system}
-																	oninput={(e) => {
+																	oninput={() => {
 																		if (!field.api_name && field.label) {
 																			field.api_name = generateApiName(field.label);
 																		}
@@ -626,6 +650,181 @@
 																	Searchable
 																</label>
 															</div>
+
+															<!-- Field Type-Specific Settings -->
+															{#if ['select', 'radio', 'multiselect'].includes(field.type)}
+																<!-- Options for select/radio/multiselect -->
+																<div class="col-span-2 space-y-2">
+																	<Label>Options</Label>
+																	<div class="space-y-2">
+																		{#if !field.options || field.options.length === 0}
+																			<p class="text-sm text-muted-foreground">No options defined</p>
+																		{:else}
+																			{#each field.options as option, optIndex}
+																				<div class="flex items-center gap-2">
+																					<Input
+																						bind:value={option.label}
+																						placeholder="Label"
+																						disabled={module.is_system}
+																						class="flex-1"
+																					/>
+																					<Input
+																						bind:value={option.value}
+																						placeholder="Value"
+																						disabled={module.is_system}
+																						class="flex-1"
+																					/>
+																					<Button
+																						variant="ghost"
+																						size="icon"
+																						onclick={() => {
+																							field.options = field.options.filter((_, i) => i !== optIndex);
+																							blocks = [...blocks];
+																						}}
+																						disabled={module.is_system}
+																					>
+																						<Trash2 class="h-4 w-4" />
+																					</Button>
+																				</div>
+																			{/each}
+																		{/if}
+																		<Button
+																			variant="outline"
+																			size="sm"
+																			onclick={() => {
+																				if (!field.options) field.options = [];
+																				field.options = [
+																					...field.options,
+																					{
+																						label: '',
+																						value: '',
+																						color: null,
+																						order: field.options.length,
+																						is_default: false
+																					}
+																				];
+																				blocks = [...blocks];
+																			}}
+																			disabled={module.is_system}
+																		>
+																			<Plus class="h-4 w-4 mr-1" />
+																			Add Option
+																		</Button>
+																	</div>
+																</div>
+															{/if}
+
+															{#if ['number', 'decimal', 'currency', 'percent'].includes(field.type)}
+																<!-- Number constraints -->
+																<div class="space-y-1.5">
+																	<Label>Minimum Value</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.min}
+																		placeholder="No minimum"
+																		disabled={module.is_system}
+																	/>
+																</div>
+																<div class="space-y-1.5">
+																	<Label>Maximum Value</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.max}
+																		placeholder="No maximum"
+																		disabled={module.is_system}
+																	/>
+																</div>
+															{/if}
+
+															{#if field.type === 'decimal'}
+																<div class="space-y-1.5 col-span-2">
+																	<Label>Decimal Places</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.decimal_places}
+																		placeholder="2"
+																		min="0"
+																		max="10"
+																		disabled={module.is_system}
+																	/>
+																</div>
+															{/if}
+
+															{#if ['text', 'textarea'].includes(field.type)}
+																<!-- Text constraints -->
+																<div class="space-y-1.5">
+																	<Label>Min Length</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.min_length}
+																		placeholder="No minimum"
+																		disabled={module.is_system}
+																	/>
+																</div>
+																<div class="space-y-1.5">
+																	<Label>Max Length</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.max_length}
+																		placeholder="No maximum"
+																		disabled={module.is_system}
+																	/>
+																</div>
+															{/if}
+
+															{#if field.type === 'textarea'}
+																<div class="space-y-1.5 col-span-2">
+																	<Label>Rows</Label>
+																	<Input
+																		type="number"
+																		bind:value={field.settings.rows}
+																		placeholder="3"
+																		min="1"
+																		max="20"
+																		disabled={module.is_system}
+																	/>
+																</div>
+															{/if}
+
+															{#if ['date', 'datetime'].includes(field.type)}
+																<!-- Date constraints -->
+																<div class="space-y-1.5">
+																	<Label>Min Date</Label>
+																	<Input
+																		type="date"
+																		bind:value={field.settings.min_date}
+																		disabled={module.is_system}
+																	/>
+																</div>
+																<div class="space-y-1.5">
+																	<Label>Max Date</Label>
+																	<Input
+																		type="date"
+																		bind:value={field.settings.max_date}
+																		disabled={module.is_system}
+																	/>
+																</div>
+															{/if}
+
+															<!-- Default Value (for all types) -->
+															<div class="space-y-1.5 col-span-2">
+																<Label>Default Value</Label>
+																<Input
+																	bind:value={field.default_value}
+																	placeholder="Optional default value"
+																	disabled={module.is_system}
+																/>
+															</div>
+
+															<!-- Help Text (for all types) -->
+															<div class="space-y-1.5 col-span-2">
+																<Label>Help Text</Label>
+																<Input
+																	bind:value={field.help_text}
+																	placeholder="Optional help text shown below field"
+																	disabled={module.is_system}
+																/>
+															</div>
 														</div>
 
 														<!-- Delete Field -->
@@ -634,6 +833,7 @@
 															size="icon"
 															onclick={() => removeField(blockIndex, fieldIndex)}
 															disabled={module.is_system}
+															data-testid="delete-field-button"
 														>
 															<Trash2 class="h-4 w-4 text-destructive" />
 														</Button>
@@ -647,7 +847,13 @@
 						</div>
 
 						<!-- Add Block Button -->
-						<Button variant="outline" onclick={addBlock} disabled={module.is_system} class="w-full">
+						<Button
+							variant="outline"
+							onclick={addBlock}
+							disabled={module.is_system}
+							class="w-full"
+							data-testid="add-block-button"
+						>
 							<Plus class="mr-2 h-4 w-4" />
 							Add Block
 						</Button>
@@ -656,8 +862,11 @@
 					<!-- Save Button for Fields -->
 					{#if blocks.length > 0}
 						<div class="flex items-center gap-4">
-							<Button onclick={handleSaveFieldsAndBlocks} disabled={saving || module.is_system}>
-								{#if saving}
+							<Button
+								onclick={handleSaveStructure}
+								disabled={savingStructure || module.is_system}
+							>
+								{#if savingStructure}
 									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 									Saving...
 								{:else}
@@ -682,9 +891,7 @@
 							<CardDescription>Advanced configuration options</CardDescription>
 						</CardHeader>
 						<CardContent>
-							<p class="text-sm text-muted-foreground">
-								Additional settings coming soon...
-							</p>
+							<p class="text-sm text-muted-foreground">Additional settings coming soon...</p>
 						</CardContent>
 					</Card>
 				</div>

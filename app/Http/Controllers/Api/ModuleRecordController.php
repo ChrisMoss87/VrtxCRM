@@ -6,13 +6,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
-use App\Infrastructure\Persistence\Eloquent\Models\ModuleRecordModel;
+use App\Services\RecordService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 final class ModuleRecordController extends Controller
 {
+    public function __construct(
+        private readonly RecordService $recordService
+    ) {}
+
     /**
      * Get paginated records for a module.
      */
@@ -23,24 +27,18 @@ final class ModuleRecordController extends Controller
         $perPage = (int) $request->query('per_page', 50);
         $page = (int) $request->query('page', 1);
 
-        $query = ModuleRecordModel::where('module_id', $module->id);
-
         // Get valid field names for validation
         $validFields = $module->blocks->flatMap->fields->pluck('api_name')->toArray();
 
-        // Handle global search
-        if ($search = $request->query('search')) {
-            $query->where('data', 'like', '%'.$search.'%');
-        }
-
-        // Handle filters (JSON array of {field, operator, value})
-        if ($filters = $request->query('filters')) {
-            if (is_string($filters)) {
-                $filters = json_decode($filters, true);
+        // Transform filters from frontend format to repository format
+        $filters = [];
+        if ($filterData = $request->query('filters')) {
+            if (is_string($filterData)) {
+                $filterData = json_decode($filterData, true);
             }
 
-            if (is_array($filters)) {
-                foreach ($filters as $filter) {
+            if (is_array($filterData)) {
+                foreach ($filterData as $filter) {
                     if (! isset($filter['field'], $filter['operator'], $filter['value'])) {
                         continue;
                     }
@@ -54,52 +52,33 @@ final class ModuleRecordController extends Controller
                         continue;
                     }
 
-                    // Apply filter based on operator
-                    match ($operator) {
-                        'equals' => $query->whereRaw("data->>'$.{$field}' = ?", [$value]),
-                        'not_equals' => $query->whereRaw("data->>'$.{$field}' != ?", [$value]),
-                        'contains' => $query->whereRaw("data->>'$.{$field}' LIKE ?", ["%{$value}%"]),
-                        'not_contains' => $query->whereRaw("data->>'$.{$field}' NOT LIKE ?", ["%{$value}%"]),
-                        'starts_with' => $query->whereRaw("data->>'$.{$field}' LIKE ?", ["{$value}%"]),
-                        'ends_with' => $query->whereRaw("data->>'$.{$field}' LIKE ?", ["%{$value}"]),
-                        'gt' => $query->whereRaw("CAST(data->>'$.{$field}' AS DECIMAL(20,2)) > ?", [$value]),
-                        'gte' => $query->whereRaw("CAST(data->>'$.{$field}' AS DECIMAL(20,2)) >= ?", [$value]),
-                        'lt' => $query->whereRaw("CAST(data->>'$.{$field}' AS DECIMAL(20,2)) < ?", [$value]),
-                        'lte' => $query->whereRaw("CAST(data->>'$.{$field}' AS DECIMAL(20,2)) <= ?", [$value]),
-                        'between' => is_array($value) && count($value) === 2
-                            ? $query->whereRaw(
-                                "CAST(data->>'$.{$field}' AS DECIMAL(20,2)) BETWEEN ? AND ?",
-                                [$value[0], $value[1]]
-                            )
-                            : null,
-                        'in' => is_array($value)
-                            ? $query->whereRaw(
-                                "data->>'$.{$field}' IN (".implode(',', array_fill(0, count($value), '?')).')',
-                                $value
-                            )
-                            : null,
-                        'not_in' => is_array($value)
-                            ? $query->whereRaw(
-                                "data->>'$.{$field}' NOT IN (".implode(',', array_fill(0, count($value), '?')).')',
-                                $value
-                            )
-                            : null,
-                        'is_null' => $query->whereRaw("data->>'$.{$field}' IS NULL"),
-                        'is_not_null' => $query->whereRaw("data->>'$.{$field}' IS NOT NULL"),
-                        default => null,
-                    };
+                    // Map operators to repository format
+                    $operatorMap = [
+                        'gt' => 'greater_than',
+                        'gte' => 'greater_than_or_equal',
+                        'lt' => 'less_than',
+                        'lte' => 'less_than_or_equal',
+                    ];
+
+                    $repoOperator = $operatorMap[$operator] ?? $operator;
+
+                    $filters[$field] = [
+                        'operator' => $repoOperator,
+                        'value' => $value,
+                    ];
                 }
             }
         }
 
-        // Handle sorting (JSON array of {field, direction})
-        if ($sort = $request->query('sort')) {
-            if (is_string($sort)) {
-                $sort = json_decode($sort, true);
+        // Transform sort from frontend format to repository format
+        $sort = [];
+        if ($sortData = $request->query('sort')) {
+            if (is_string($sortData)) {
+                $sortData = json_decode($sortData, true);
             }
 
-            if (is_array($sort)) {
-                foreach ($sort as $sortConfig) {
+            if (is_array($sortData)) {
+                foreach ($sortData as $sortConfig) {
                     if (! isset($sortConfig['field'], $sortConfig['direction'])) {
                         continue;
                     }
@@ -108,7 +87,7 @@ final class ModuleRecordController extends Controller
                     $direction = mb_strtolower($sortConfig['direction']);
 
                     // Validate field and direction
-                    if (! in_array($field, $validFields, true)) {
+                    if (! in_array($field, $validFields, true) && ! in_array($field, ['id', 'created_at', 'updated_at'], true)) {
                         continue;
                     }
 
@@ -116,31 +95,33 @@ final class ModuleRecordController extends Controller
                         continue;
                     }
 
-                    // Handle special fields
-                    if (in_array($field, ['id', 'created_at', 'updated_at'], true)) {
-                        $query->orderBy($field, $direction);
-                    } else {
-                        // Sort by JSON field
-                        $query->orderByRaw("data->>'$.{$field}' {$direction}");
-                    }
+                    $sort[$field] = $direction;
                 }
             }
-        } else {
-            // Default sort by created_at desc
-            $query->orderBy('created_at', 'desc');
         }
 
-        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        // Default sort if none provided
+        if (empty($sort)) {
+            $sort = ['created_at' => 'desc'];
+        }
+
+        // Use service to get records
+        $result = $this->recordService->getRecords($module->id, $filters, $sort, $page, $perPage);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => array_map(fn ($record) => [
+                'id' => $record->id(),
+                'data' => $record->data(),
+                'created_at' => $record->createdAt()?->format('c'),
+                'updated_at' => $record->updatedAt()?->format('c'),
+            ], $result['data']),
             'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'from' => $paginator->firstItem(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'to' => $paginator->lastItem(),
-                'total' => $paginator->total(),
+                'current_page' => $result['current_page'],
+                'from' => ($result['current_page'] - 1) * $result['per_page'] + 1,
+                'last_page' => $result['last_page'],
+                'per_page' => $result['per_page'],
+                'to' => min($result['current_page'] * $result['per_page'], $result['total']),
+                'total' => $result['total'],
             ],
         ]);
     }
@@ -152,12 +133,21 @@ final class ModuleRecordController extends Controller
     {
         $module = ModuleModel::where('api_name', $moduleApiName)->firstOrFail();
 
-        $record = ModuleRecordModel::where('module_id', $module->id)
-            ->where('id', $id)
-            ->firstOrFail();
+        $record = $this->recordService->getRecord($module->id, $id);
+
+        if (! $record) {
+            return response()->json([
+                'message' => 'Record not found',
+            ], 404);
+        }
 
         return response()->json([
-            'data' => $record,
+            'data' => [
+                'id' => $record->id(),
+                'data' => $record->data(),
+                'created_at' => $record->createdAt()?->format('c'),
+                'updated_at' => $record->updatedAt()?->format('c'),
+            ],
         ]);
     }
 
@@ -166,30 +156,29 @@ final class ModuleRecordController extends Controller
      */
     public function store(Request $request, string $moduleApiName): JsonResponse
     {
-        $module = ModuleModel::with(['blocks.fields.relationship.toModule'])->where('api_name', $moduleApiName)->firstOrFail();
-
-        // Build validation rules from module fields
-        $rules = $this->buildValidationRules($module);
+        $module = ModuleModel::with(['blocks.fields.options'])->where('api_name', $moduleApiName)->firstOrFail();
 
         try {
-            $validated = $request->validate($rules);
-        } catch (ValidationException $e) {
+            $record = $this->recordService->createRecord(
+                $module->id,
+                $request->all(),
+                auth()->id()
+            );
+
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
+                'data' => [
+                    'id' => $record->id(),
+                    'data' => $record->data(),
+                    'created_at' => $record->createdAt()?->format('c'),
+                    'updated_at' => $record->updatedAt()?->format('c'),
+                ],
+                'message' => ucfirst($module->name).' created successfully',
+            ], 201);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        // Create the record
-        $record = ModuleRecordModel::create([
-            'module_id' => $module->id,
-            'data' => $validated,
-        ]);
-
-        return response()->json([
-            'data' => $record,
-            'message' => ucfirst($module->name).' created successfully',
-        ], 201);
     }
 
     /**
@@ -197,33 +186,30 @@ final class ModuleRecordController extends Controller
      */
     public function update(Request $request, string $moduleApiName, int $id): JsonResponse
     {
-        $module = ModuleModel::with(['blocks.fields.relationship.toModule'])->where('api_name', $moduleApiName)->firstOrFail();
-
-        $record = ModuleRecordModel::where('module_id', $module->id)
-            ->where('id', $id)
-            ->firstOrFail();
-
-        // Build validation rules from module fields
-        $rules = $this->buildValidationRules($module);
+        $module = ModuleModel::with(['blocks.fields.options'])->where('api_name', $moduleApiName)->firstOrFail();
 
         try {
-            $validated = $request->validate($rules);
-        } catch (ValidationException $e) {
+            $record = $this->recordService->updateRecord(
+                $module->id,
+                $id,
+                $request->all(),
+                auth()->id()
+            );
+
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
+                'data' => [
+                    'id' => $record->id(),
+                    'data' => $record->data(),
+                    'created_at' => $record->createdAt()?->format('c'),
+                    'updated_at' => $record->updatedAt()?->format('c'),
+                ],
+                'message' => ucfirst($module->name).' updated successfully',
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        // Update the record
-        $record->update([
-            'data' => $validated,
-        ]);
-
-        return response()->json([
-            'data' => $record,
-            'message' => ucfirst($module->name).' updated successfully',
-        ]);
     }
 
     /**
@@ -233,119 +219,82 @@ final class ModuleRecordController extends Controller
     {
         $module = ModuleModel::where('api_name', $moduleApiName)->firstOrFail();
 
-        $record = ModuleRecordModel::where('module_id', $module->id)
-            ->where('id', $id)
-            ->firstOrFail();
+        try {
+            // Handle related records if RelatedRecordsService exists
+            if (class_exists(\App\Services\RelatedRecordsService::class)) {
+                $relatedRecordsService = app(\App\Services\RelatedRecordsService::class);
+                $relatedRecordsService->handleCascadeDelete($module->id, $id);
+                $relatedRecordsService->cleanupOrphanedReferences($module->id, $id);
+            }
 
-        // Handle related records
-        $relatedRecordsService = app(\App\Services\RelatedRecordsService::class);
+            // Delete the record
+            $this->recordService->deleteRecord($module->id, $id);
 
-        // Cascade delete related records if configured
-        $relatedRecordsService->handleCascadeDelete($module->id, $record->id);
-
-        // Clean up orphaned references in other records
-        $relatedRecordsService->cleanupOrphanedReferences($module->id, $record->id);
-
-        // Delete the record
-        $record->delete();
-
-        return response()->json([
-            'message' => ucfirst($module->name).' deleted successfully',
-        ]);
+            return response()->json([
+                'message' => ucfirst($module->name).' deleted successfully',
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
-     * Build Laravel validation rules from module field definitions.
+     * Bulk delete records.
      */
-    private function buildValidationRules(ModuleModel $module): array
+    public function bulkDelete(Request $request, string $moduleApiName): JsonResponse
     {
-        $rules = [];
+        $module = ModuleModel::where('api_name', $moduleApiName)->firstOrFail();
 
-        foreach ($module->blocks as $block) {
-            foreach ($block->fields as $field) {
-                $fieldRules = [];
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
 
-                // Required validation
-                if ($field->is_required) {
-                    $fieldRules[] = 'required';
-                } else {
-                    $fieldRules[] = 'nullable';
-                }
+        try {
+            $count = $this->recordService->bulkDeleteRecords($module->id, $validated['ids']);
 
-                // Type-based validation
-                switch ($field->type) {
-                    case 'email':
-                        $fieldRules[] = 'email';
-                        break;
-                    case 'url':
-                        $fieldRules[] = 'url';
-                        break;
-                    case 'number':
-                    case 'decimal':
-                    case 'currency':
-                    case 'percent':
-                        $fieldRules[] = 'numeric';
-                        break;
-                    case 'date':
-                        $fieldRules[] = 'date';
-                        break;
-                    case 'datetime':
-                        $fieldRules[] = 'date';
-                        break;
-                    case 'select':
-                    case 'radio':
-                        // Validate against field options
-                        $values = $field->options->pluck('value')->toArray();
-                        if (! empty($values)) {
-                            $fieldRules[] = 'in:'.implode(',', $values);
-                        }
-                        break;
-                    case 'multiselect':
-                        $fieldRules[] = 'array';
-                        break;
-                    case 'checkbox':
-                    case 'toggle':
-                        $fieldRules[] = 'boolean';
-                        break;
-                    case 'lookup':
-                        // Validate lookup field based on relationship
-                        if ($field->relationship) {
-                            $relatedModule = $field->relationship->toModule;
-
-                            // For one-to-many: single integer (related record ID)
-                            if ($field->relationship->type === 'one_to_many') {
-                                $fieldRules[] = 'integer';
-                                $fieldRules[] = "exists:module_records,id,module_id,{$relatedModule->id}";
-                            }
-                            // For many-to-many: array of integers
-                            elseif ($field->relationship->type === 'many_to_many') {
-                                $fieldRules[] = 'array';
-                                $fieldRules[] = "exists:module_records,id,module_id,{$relatedModule->id}";
-                            }
-                        } else {
-                            $fieldRules[] = 'integer';
-                        }
-                        break;
-                    default:
-                        $fieldRules[] = 'string';
-                }
-
-                // Unique validation
-                if ($field->is_unique) {
-                    $fieldRules[] = 'unique:module_records,data->'.$field->api_name;
-                }
-
-                // Custom validation rules from field settings
-                if (! empty($field->validation_rules)) {
-                    if (is_array($field->validation_rules)) {
-                        $fieldRules = array_merge($fieldRules, $field->validation_rules);
-                    }
-                }
-
-                $rules[$field->api_name] = $fieldRules;
-            }
+            return response()->json([
+                'message' => "Successfully deleted {$count} record(s)",
+                'count' => $count,
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
         }
+    }
 
-        return $rules;
+    /**
+     * Bulk update records.
+     */
+    public function bulkUpdate(Request $request, string $moduleApiName): JsonResponse
+    {
+        $module = ModuleModel::where('api_name', $moduleApiName)->firstOrFail();
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+            'data' => ['required', 'array'],
+        ]);
+
+        try {
+            $count = $this->recordService->bulkUpdateRecords(
+                $module->id,
+                $validated['ids'],
+                $validated['data'],
+                auth()->id()
+            );
+
+            return response()->json([
+                'message' => "Successfully updated {$count} record(s)",
+                'count' => $count,
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

@@ -73,6 +73,8 @@ Route::middleware([
             // Module record endpoints
             Route::get('modules/{moduleApiName}/records', [ModuleRecordController::class, 'index'])->name('api.modules.records.index');
             Route::post('modules/{moduleApiName}/records', [ModuleRecordController::class, 'store'])->name('api.modules.records.store');
+            Route::post('modules/{moduleApiName}/records/bulk-delete', [ModuleRecordController::class, 'bulkDelete'])->name('api.modules.records.bulk-delete');
+            Route::post('modules/{moduleApiName}/records/bulk-update', [ModuleRecordController::class, 'bulkUpdate'])->name('api.modules.records.bulk-update');
             Route::get('modules/{moduleApiName}/records/{id}', [ModuleRecordController::class, 'show'])->name('api.modules.records.show');
             Route::get('modules/{moduleApiName}/records/{id}/related', [App\Http\Controllers\Api\RelatedRecordsController::class, 'index'])->name('api.modules.records.related');
             Route::put('modules/{moduleApiName}/records/{id}', [ModuleRecordController::class, 'update'])->name('api.modules.records.update');

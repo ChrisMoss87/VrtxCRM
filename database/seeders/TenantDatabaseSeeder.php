@@ -35,5 +35,8 @@ final class TenantDatabaseSeeder extends Seeder
         // Seed CRM modules
         $this->call(ModuleSeeder::class);
         $this->command->info('✓ Seeded CRM modules for tenant: '.tenant('name'));
+
+        // Seed sample contacts
+        $this->call(SampleContactsSeeder::class);
     }
 }

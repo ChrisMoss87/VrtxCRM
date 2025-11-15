@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { router } from '@inertiajs/svelte';
+	import { router, useForm } from '@inertiajs/svelte';
 	import { Button } from '@/components/ui/button';
 	import { Input } from '@/components/ui/input';
 	import { Label } from '@/components/ui/label';
@@ -35,20 +35,21 @@
 	import { toast } from 'svelte-sonner';
 	import type { ComponentType } from 'svelte';
 
-	let name = $state('');
-	let singularName = $state('');
-	let icon = $state('');
-	let description = $state('');
-	let isActive = $state(true);
-
-	let saving = $state(false);
-	let errors = $state<Record<string, string>>({});
+	const form = useForm({
+		name: '',
+		singular_name: '',
+		icon: '',
+		description: '',
+		is_active: true
+	});
 
 	// Auto-generate singular name from name
 	$effect(() => {
-		if (name && !singularName) {
+		if (form.data.name && !form.data.singular_name) {
 			// Remove trailing 's' if present
-			singularName = name.endsWith('s') ? name.slice(0, -1) : name;
+			form.data.singular_name = form.data.name.endsWith('s')
+				? form.data.name.slice(0, -1)
+				: form.data.name;
 		}
 	});
 
@@ -56,31 +57,31 @@
 		router.visit('/admin/modules');
 	}
 
+	let saving = $state(false);
+
 	async function handleSave() {
-		errors = {};
 		saving = true;
+		form.clearErrors();
 
 		try {
 			const response = await fetch('/api/admin/modules', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+					'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+					'Accept': 'application/json'
 				},
-				body: JSON.stringify({
-					name,
-					singular_name: singularName,
-					icon: icon || null,
-					description: description || null,
-					is_active: isActive
-				})
+				body: JSON.stringify(form.data)
 			});
 
 			const data = await response.json();
 
 			if (!response.ok) {
 				if (data.errors) {
-					errors = data.errors;
+					// Set form errors
+					Object.keys(data.errors).forEach(key => {
+						form.setError(key, data.errors[key][0] || data.errors[key]);
+					});
 					toast.error('Validation failed. Please check the form.');
 				} else {
 					toast.error(data.error || 'Failed to create module');
@@ -157,13 +158,13 @@
 							<Label for="name">Module Name *</Label>
 							<Input
 								id="name"
-								bind:value={name}
+								bind:value={form.data.name}
 								placeholder="e.g., Projects, Leads, Invoices"
 								required
 								autofocus
 							/>
-							{#if errors.name}
-								<p class="text-sm text-destructive">{errors.name[0]}</p>
+							{#if form.errors.name}
+								<p class="text-sm text-destructive">{form.errors.name}</p>
 							{/if}
 							<p class="text-xs text-muted-foreground">
 								The plural name displayed in navigation and lists
@@ -175,12 +176,12 @@
 							<Label for="singular_name">Singular Name *</Label>
 							<Input
 								id="singular_name"
-								bind:value={singularName}
+								bind:value={form.data.singular_name}
 								placeholder="e.g., Project, Lead, Invoice"
 								required
 							/>
-							{#if errors.singular_name}
-								<p class="text-sm text-destructive">{errors.singular_name[0]}</p>
+							{#if form.errors.singular_name}
+								<p class="text-sm text-destructive">{form.errors.singular_name}</p>
 							{/if}
 							<p class="text-xs text-muted-foreground">
 								Used for single records (e.g., "Create Project")
@@ -196,10 +197,10 @@
 										{@const IconComp = iconOption.component}
 										<button
 											type="button"
-											onclick={() => (icon = iconOption.name)}
+											onclick={() => (form.data.icon = iconOption.name)}
 											class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center transition-colors"
-											class:bg-accent={icon === iconOption.name}
-											class:text-accent-foreground={icon === iconOption.name}
+											class:bg-accent={form.data.icon === iconOption.name}
+											class:text-accent-foreground={form.data.icon === iconOption.name}
 											title={iconOption.name}
 										>
 											<IconComp class="h-5 w-5" />
@@ -218,7 +219,7 @@
 							<Label for="description">Description</Label>
 							<Textarea
 								id="description"
-								bind:value={description}
+								bind:value={form.data.description}
 								placeholder="What is this module used for?"
 								rows={3}
 							/>
@@ -235,7 +236,7 @@
 									Inactive modules are hidden from users
 								</p>
 							</div>
-							<Switch id="is_active" bind:checked={isActive} />
+							<Switch id="is_active" bind:checked={form.data.is_active} />
 						</div>
 					</CardContent>
 				</Card>

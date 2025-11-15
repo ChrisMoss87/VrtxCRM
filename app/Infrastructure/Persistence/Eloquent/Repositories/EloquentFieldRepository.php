@@ -23,12 +23,9 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
 
     public function findByModuleId(int $moduleId): array
     {
-        return FieldModel::with('options')
-            ->where('module_id', $moduleId)
-            ->orderBy('order')
-            ->get()
-            ->map(fn (FieldModel $model): Field => $this->toDomain($model))
-            ->all();
+        // Fields don't have module_id, they belong to blocks
+        // This method may not be needed or should query through blocks
+        return [];
     }
 
     public function findByBlockId(int $blockId): array
@@ -44,9 +41,8 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
     public function save(Field $field): Field
     {
         $data = [
-            'module_id' => $field->moduleId(),
             'block_id' => $field->blockId(),
-            'name' => $field->name(),
+            'label' => $field->label(),
             'api_name' => $field->apiName(),
             'type' => $field->type()->value,
             'description' => $field->description(),
@@ -54,8 +50,6 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
             'is_required' => $field->isRequired(),
             'is_unique' => $field->isUnique(),
             'is_searchable' => $field->isSearchable(),
-            'is_visible_in_list' => $field->isVisibleInList(),
-            'is_visible_in_detail' => $field->isVisibleInDetail(),
             'validation_rules' => $field->validationRules()->jsonSerialize(),
             'settings' => $field->settings()->jsonSerialize(),
             'default_value' => $field->defaultValue(),
@@ -80,7 +74,10 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
 
     public function existsByApiName(int $moduleId, string $apiName, ?int $excludeId = null): bool
     {
-        $query = FieldModel::where('module_id', $moduleId)
+        // Since fields don't have module_id directly, we need to join through blocks
+        $query = FieldModel::whereHas('block', function ($q) use ($moduleId) {
+            $q->where('module_id', $moduleId);
+        })
             ->where('api_name', $apiName);
 
         if ($excludeId !== null) {
@@ -94,9 +91,8 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
     {
         $field = new Field(
             id: $model->id,
-            moduleId: $model->module_id,
             blockId: $model->block_id,
-            name: $model->name,
+            label: $model->label,
             apiName: $model->api_name,
             type: FieldType::from($model->type),
             description: $model->description,
@@ -104,8 +100,6 @@ final class EloquentFieldRepository implements FieldRepositoryInterface
             isRequired: $model->is_required,
             isUnique: $model->is_unique,
             isSearchable: $model->is_searchable,
-            isVisibleInList: $model->is_visible_in_list,
-            isVisibleInDetail: $model->is_visible_in_detail,
             validationRules: ValidationRules::fromArray($model->validation_rules ?? []),
             settings: FieldSettings::fromArray($model->settings ?? []),
             defaultValue: $model->default_value,

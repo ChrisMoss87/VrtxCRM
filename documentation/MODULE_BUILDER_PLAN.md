@@ -1,352 +1,672 @@
-# Module Builder - Implementation Plan
+# Module Builder - Execution Plan
+
+**Created**: 2025-11-15
+**Status**: Planning Phase
+**Priority**: High
+**Goal**: Complete the Module Builder system and integrate it with DataTable for a fully functional dynamic CRM
+
+---
 
 ## Overview
-The Module Builder is a visual interface that allows users to create and manage custom modules (entities) with fields, blocks, and relationships. This is the core feature of the dynamic CRM system.
 
-## User Journey
+The Module Builder is the core feature of VrtxCRM that allows users to create custom modules (entities) with custom fields at runtime. This system powers the entire CRM by enabling tenant administrators to design their own data structures without code.
 
-### 1. Module List View (`/modules`)
-**Purpose**: Overview of all modules in the system
+**Current State** (SIGNIFICANTLY MORE COMPLETE THAN INITIALLY ASSESSED):
+- ✅ **COMPLETE** - Module Create page (name, singular name, icon, description)
+- ✅ **COMPLETE** - Module Edit page with tabbed interface (Basic Info, Fields & Blocks, Settings)
+- ✅ **COMPLETE** - Block management (add, edit, delete, drag-to-reorder)
+- ✅ **COMPLETE** - Field management (add, edit, delete, drag-to-reorder within blocks)
+- ✅ **COMPLETE** - Field configuration:
+  - Label, API name (auto-generated from label)
+  - Field type selector (text, email, phone, etc.)
+  - Width settings (25%, 33%, 50%, 66%, 75%, 100%)
+  - Description/help text
+  - Flags: Required, Unique, Searchable
+- ✅ **COMPLETE** - Drag-and-drop using svelte-dnd-action:
+  - Reorder blocks
+  - Reorder fields within blocks
+- ✅ **COMPLETE** - Save functionality:
+  - Save basic info (PUT /api/admin/modules/{id})
+  - Save structure (POST /api/admin/modules/{id}/sync-structure)
+- ✅ **COMPLETE** - Backend module/block/field services
+- ✅ **COMPLETE** - Domain-driven repository pattern
+- ✅ **COMPLETE** - Module activation toggle (is_active)
+- ✅ **COMPLETE** - System module protection (read-only for system modules)
+- ✅ **COMPLETE** - Browser test coverage (tests/browser/module-builder.spec.ts)
+  - Create module workflow
+  - Add blocks and fields
+  - Drag-and-drop testing
+  - Delete operations
 
-**Components Needed**:
-- Module cards/table showing:
-  - Icon + Name
-  - Description
-  - Number of fields
-  - Number of records
-  - Active/Inactive status
-  - Last modified date
-- Actions:
-  - Create New Module button
-  - Edit module
-  - Deactivate/Activate module
-  - Delete module (with confirmation)
-  - View module records
+**What's Actually Missing**:
+- ⬜ Field type-specific settings (options for select/radio, min/max for numbers, etc.)
+- ⬜ Live preview panel
+- ⬜ Field templates/presets
+- ⬜ Module Record CRUD views (Index, Create, Edit, Show)
+- ⬜ Dynamic form rendering component
+- ⬜ Advanced features (relationships, formulas, conditional logic)
+- ⬜ More comprehensive tests
 
-**UI Design**:
-- Grid layout for module cards (similar to app icons)
-- Each card shows module icon, name, description, field count
-- Quick actions on hover/click
-- Filter: Active/Inactive/All
-- Search modules by name
+---
 
-### 2. Module Builder View (`/modules/create` or `/modules/{id}/edit`)
-**Purpose**: Create or edit a module with its structure
+## Architecture Overview
 
-**Tab Structure**:
+### Technology Stack
+- **Frontend**: Svelte 5 (Runes) + TypeScript
+- **Drag & Drop**: svelte-dnd-action
+- **Backend**: Laravel 12 + Domain-Driven Design
+- **UI Components**: shadcn-svelte + Tailwind CSS v4
+
+### Data Flow
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ [Module Details] [Fields & Blocks] [Relationships] [Settings]│
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### Tab 1: Module Details
-**Fields**:
-- Module Name (text, required) - e.g., "Contacts"
-- Singular Name (text, required) - e.g., "Contact"
-- Icon (icon picker with Lucide icons)
-- Description (textarea)
-- Order (number) - for display ordering
-
-**Preview**:
-- Show how the module will appear in navigation
-
-#### Tab 2: Fields & Blocks
-**Layout**: Two-panel design
-
-**Left Panel - Structure Tree**:
-```
-Module: Contacts
-├─ Block: Basic Information (section)
-│  ├─ First Name (text)
-│  ├─ Last Name (text)
-│  ├─ Email (email)
-│  └─ Phone (phone)
-├─ Block: Address (accordion, collapsed)
-│  ├─ Street (textarea)
-│  ├─ City (text)
-│  └─ Country (select)
-└─ + Add Block
+Module Builder UI (Svelte)
+    ↓ (API calls)
+ModuleManagementController
+    ↓ (orchestration)
+ModuleService / BlockService / FieldService
+    ↓ (domain logic)
+ModuleRepository / BlockRepository / FieldRepository
+    ↓ (persistence)
+Database (PostgreSQL)
 ```
 
-- Drag-and-drop to reorder blocks and fields
-- Expand/collapse blocks
-- Click to edit
-- Delete with confirmation
+---
 
-**Right Panel - Field/Block Editor**:
+## Phase 1: Complete Field Configuration UI
 
-When Block is selected:
-- Block Name (text, required)
-- Block Type (select: section, tab, accordion, card)
-- Layout Columns (select: 1, 2, 3, 4)
-- Collapsible (toggle)
-- Collapsed by Default (toggle, only if collapsible)
+**Priority**: Critical
+**Estimated Time**: 3-4 hours (REDUCED - most work already done)
 
-When Field is selected:
-- **Basic Settings**:
-  - Field Label (text, required)
-  - API Name (text, auto-generated from label, editable)
-  - Field Type (select with icons):
-    - Text
-    - Textarea
-    - Number/Decimal
-    - Email
-    - Phone
-    - URL
-    - Select/Multiselect
-    - Radio
-    - Checkbox
-    - Toggle
-    - Date/DateTime/Time
-    - Currency
-    - Percent
-    - Lookup (relationship)
-    - Formula
-    - File/Image
-    - Rich Text
-  - Description (textarea)
-  - Help Text (text)
+### 1.1 Field Type-Specific Settings ⬜
+**Time**: 3-4 hours (HIGH PRIORITY - only major gap)
 
-- **Validation Rules**:
-  - Required (toggle)
-  - Unique (toggle)
-  - Min Length / Max Length (for text)
-  - Min Value / Max Value (for numbers)
-  - Pattern (regex, advanced)
-  - Custom Validation Rules (array)
+**Tasks**:
+- [ ] Create `FieldTypeSelector.svelte` component
+  - Grid display of all field types with icons
+  - Categorized by type (Text, Number, Date, Selection, etc.)
+  - Click to add field to current block
+- [ ] Create `FieldConfigPanel.svelte` component
+  - Side panel for editing field properties
+  - Dynamic form based on field type
+  - Real-time validation
+- [ ] Add field type icons and descriptions
+- [ ] Implement field templates/presets (e.g., "Email Address", "Phone Number")
 
-- **Display Settings**:
-  - Show in List View (toggle)
-  - Show in Detail View (toggle)
-  - Searchable (toggle)
-  - Width (select: 25%, 50%, 75%, 100%)
-  - Default Value (text/number/etc.)
+**Field Types to Support**:
+- Text Fields: text, textarea, email, phone, url
+- Numeric: number, decimal, currency, percent
+- Selection: select, radio, multiselect, checkbox, toggle
+- Date/Time: date, datetime, time
+- Advanced: lookup (relationships), formula, file, image, rich_text
 
-- **Field Type Specific Settings**:
-  - For Select/Multiselect/Radio:
-    - Options Manager:
-      ```
-      ┌────────────────────────────────────┐
-      │ Label       Value      Color  Default│
-      ├────────────────────────────────────┤
-      │ Active      active     green   [x]  │
-      │ Inactive    inactive   gray    [ ]  │
-      │ + Add Option                        │
-      └────────────────────────────────────┘
-      ```
-  - For Currency:
-    - Currency Code (select: USD, EUR, GBP, etc.)
-    - Precision (decimal places)
-  - For Decimal/Percent:
-    - Precision (decimal places)
-  - For Lookup:
-    - Related Module (select from modules)
-    - Display Field (select field from related module)
-  - For Formula:
-    - Formula Expression (textarea with syntax help)
-  - For File/Image:
-    - Allowed File Types (multiselect)
-    - Max File Size (number in KB)
+**Acceptance Criteria**:
+- User can click field type to add to block
+- Configuration panel shows all relevant options
+- Field properties auto-populate with sensible defaults
+- Validation prevents invalid configurations
 
-#### Tab 3: Relationships
-**Purpose**: Define relationships between modules
+---
 
-**Layout**:
-Table showing existing relationships:
-| Relationship Name | Related Module | Type | Inverse Name |
-|------------------|----------------|------|--------------|
-| Account | Accounts | One to Many | Contacts |
+### 1.2 Field-Specific Settings ⬜
+**Time**: 4 hours
 
-**Add Relationship Form**:
-- Relationship Name (text, required)
-- Related Module (select from modules)
-- Relationship Type (select):
-  - One to One
-  - One to Many
-  - Many to Many
-- Inverse Relationship Name (text)
+**Tasks**:
+- [ ] Text field settings:
+  - Min/max length
+  - Character restrictions (alphanumeric, etc.)
+  - Text case (uppercase, lowercase, title case)
+  - Placeholder text
+- [ ] Number field settings:
+  - Min/max values
+  - Decimal places
+  - Increment step
+  - Number format (thousands separator)
+- [ ] Selection field settings (select/radio/multiselect):
+  - Option management (add/edit/delete/reorder)
+  - Default selection
+  - Option colors
+  - Allow custom values
+- [ ] Date field settings:
+  - Min/max dates
+  - Default to today
+  - Date format
+- [ ] Validation rules:
+  - Required field toggle
+  - Unique value enforcement
+  - Custom validation patterns (regex)
+  - Conditional validation
 
-#### Tab 4: Settings
-**Module Features**:
-- Enable Import (toggle)
-- Enable Export (toggle)
-- Enable Mass Actions (toggle)
-- Enable Comments (toggle)
-- Enable Attachments (toggle)
-- Enable Activity Log (toggle)
-- Enable Custom Views (toggle)
-- Record Name Field (select from text fields) - used as display name
+**Acceptance Criteria**:
+- Each field type has appropriate settings
+- Settings are saved and persisted
+- Validation rules are enforced on record creation
+- Settings UI is intuitive and well-organized
 
-**Permissions** (future):
-- View permission
-- Create permission
-- Edit permission
-- Delete permission
+---
 
-### 3. Field Type Components (Reusable)
-Create Svelte components for each field type configuration:
-- `FieldTypeSelector.svelte` - Grid of field types with icons
-- `TextFieldConfig.svelte` - Text field settings
-- `SelectFieldConfig.svelte` - Select with options manager
-- `NumberFieldConfig.svelte` - Number/decimal/currency/percent
-- `DateFieldConfig.svelte` - Date/time settings
-- `LookupFieldConfig.svelte` - Relationship configuration
-- `ValidationRulesConfig.svelte` - Validation rules editor
-- `DisplaySettingsConfig.svelte` - Display settings
+### 1.3 Field Layout & Styling ⬜
+**Time**: 2 hours
 
-### 4. Module Record Views (After Builder is Complete)
-Once modules are created, users need to:
-- List records (`/modules/{module_slug}/records`)
-- Create record (`/modules/{module_slug}/records/create`)
-- View record (`/modules/{module_slug}/records/{id}`)
-- Edit record (`/modules/{module_slug}/records/{id}/edit`)
+**Tasks**:
+- [ ] Width controls (25%, 50%, 75%, 100%)
+- [ ] Field ordering within blocks
+- [ ] Show/hide field toggle
+- [ ] Field help text and descriptions
+- [ ] Conditional visibility rules (show field if...)
 
-These views must be **dynamically generated** based on module definition.
+**Acceptance Criteria**:
+- Fields can be arranged in multi-column layouts
+- Drag to reorder fields within block
+- Preview reflects layout accurately
 
-## Components Architecture
+---
 
-```
-pages/modules/
-├── Index.svelte              # Module list
-├── Create.svelte             # Create module
-└── [id]/
-    └── Edit.svelte           # Edit module
+### 1.4 Block Management ⬜
+**Time**: 2 hours
 
-components/modules/
-├── ModuleCard.svelte         # Module grid card
-├── ModuleForm.svelte         # Main module form with tabs
-├── blocks/
-│   ├── BlockList.svelte      # Left panel tree view
-│   ├── BlockEditor.svelte    # Block settings editor
-│   └── BlockItem.svelte      # Draggable block item
-├── fields/
-│   ├── FieldEditor.svelte    # Main field editor
-│   ├── FieldTypeSelector.svelte
-│   ├── FieldBasicSettings.svelte
-│   ├── FieldValidation.svelte
-│   ├── FieldDisplay.svelte
-│   └── field-configs/
-│       ├── TextFieldConfig.svelte
-│       ├── SelectFieldConfig.svelte
-│       ├── NumberFieldConfig.svelte
-│       ├── DateFieldConfig.svelte
-│       ├── LookupFieldConfig.svelte
-│       └── ...
-├── relationships/
-│   ├── RelationshipList.svelte
-│   └── RelationshipForm.svelte
-└── settings/
-    └── ModuleSettings.svelte
-```
+**Tasks**:
+- [ ] Create `BlockManager.svelte` component
+- [ ] Add new block (section, tab, accordion)
+- [ ] Edit block properties (label, columns, collapsible)
+- [ ] Delete block with confirmation
+- [ ] Reorder blocks via drag-and-drop
+- [ ] Duplicate block
 
-## State Management
+**Acceptance Criteria**:
+- Blocks can be added, edited, deleted, reordered
+- Each block type has specific settings
+- Deleting block prompts confirmation if fields exist
 
-Use Svelte 5 runes for local component state:
-```typescript
-let module = $state({
-  id: null,
-  name: '',
-  singular_name: '',
-  icon: null,
-  description: '',
-  is_active: true,
-  settings: {},
-  order: 0,
-  blocks: [],
-  fields: [],
-  relationships: []
-});
+---
 
-let selectedItem = $state(null); // Currently selected block or field
-let activeTab = $state('details'); // Current tab
-```
+## Phase 2: Preview & Testing Mode
 
-## API Endpoints Needed
+**Priority**: High
+**Estimated Time**: 6-8 hours
 
-```
-GET    /api/modules                    # List all modules
-POST   /api/modules                    # Create module
-GET    /api/modules/{id}               # Get module with full structure
-PUT    /api/modules/{id}               # Update module
-DELETE /api/modules/{id}               # Delete module
-PATCH  /api/modules/{id}/activate      # Activate module
-PATCH  /api/modules/{id}/deactivate    # Deactivate module
+### 2.1 Live Preview Panel ⬜
+**Time**: 4 hours
 
-POST   /api/modules/{id}/blocks        # Add block to module
-PUT    /api/modules/{id}/blocks/{blockId}        # Update block
-DELETE /api/modules/{id}/blocks/{blockId}        # Delete block
-POST   /api/modules/{id}/blocks/reorder          # Reorder blocks
+**Tasks**:
+- [ ] Create `ModulePreview.svelte` component
+- [ ] Split-screen view (builder on left, preview on right)
+- [ ] Real-time preview of form layout
+- [ ] Render fields using actual field components
+- [ ] Preview different viewport sizes (desktop, tablet, mobile)
+- [ ] Toggle between create and edit modes
 
-POST   /api/modules/{id}/fields        # Add field to module
-PUT    /api/modules/{id}/fields/{fieldId}        # Update field
-DELETE /api/modules/{id}/fields/{fieldId}        # Delete field
-POST   /api/modules/{id}/fields/reorder          # Reorder fields
+**Acceptance Criteria**:
+- Preview updates in real-time as fields are added/modified
+- Preview accurately reflects final form appearance
+- Responsive preview shows how form adapts to screen sizes
 
-POST   /api/modules/{id}/relationships  # Add relationship
-PUT    /api/modules/{id}/relationships/{relId}   # Update relationship
-DELETE /api/modules/{id}/relationships/{relId}   # Delete relationship
-```
+---
 
-## Drag and Drop Implementation
+### 2.2 Test Data Generation ⬜
+**Time**: 2 hours
 
-Use `svelte-dnd-action` or native HTML5 drag and drop:
-- Drag blocks to reorder
-- Drag fields between blocks
-- Drag fields to reorder within block
-- Visual feedback during drag
+**Tasks**:
+- [ ] Add "Test with Sample Data" button
+- [ ] Auto-generate realistic test values for each field type
+- [ ] Show validation errors in preview
+- [ ] Clear test data button
 
-## Validation
+**Acceptance Criteria**:
+- Sample data accurately reflects field types
+- Validation rules are visually tested
+- User can identify validation issues before publishing
 
-Client-side validation:
-- Module name required
-- API name must be snake_case
-- API name must be unique within module
-- Block names required
-- Field names required
-- Field type required
-- Options required for select/multiselect/radio fields
+---
 
-Server-side validation:
-- Same as client-side
-- Check for SQL reserved keywords in API names
-- Validate relationships point to existing modules
+### 2.3 Module Validation ⬜
+**Time**: 2 hours
 
-## Progressive Enhancement
+**Tasks**:
+- [ ] Pre-publish validation checks:
+  - At least one field required
+  - All required fields have labels
+  - API names are unique
+  - At least one block exists
+  - Select fields have at least one option
+- [ ] Validation error summary panel
+- [ ] Click error to jump to problematic field
 
-### Phase 1 (MVP):
-- Module details
-- Blocks (sections only)
-- Basic field types (text, textarea, select, checkbox, toggle)
-- No relationships
-- Basic settings
+**Acceptance Criteria**:
+- Cannot publish module with validation errors
+- Errors are clearly communicated
+- Easy to fix errors from validation panel
 
-### Phase 2:
-- All field types
-- Field validation rules
-- Drag and drop
-- Block types (tabs, accordion, cards)
+---
 
-### Phase 3:
-- Relationships
-- Lookup fields
-- Formula fields
-- Advanced validation
+## Phase 3: Module Activation & Publishing
 
-### Phase 4:
-- Import/Export
-- Custom views
-- Permissions
-- Activity log
+**Priority**: High
+**Estimated Time**: 4-6 hours
 
-## Next Steps
+### 3.1 Module Status Management ⬜
+**Time**: 2 hours
 
-1. ✅ Create domain entities and database structure
-2. ✅ Create form wrapper components
-3. ✅ Seed sample modules
-4. Create Application layer (Services, Commands, Queries)
-5. Create Controllers and API endpoints
-6. Create Module List page
-7. Create Module Builder page (Phase 1)
-8. Test creating a module through UI
-9. Iterate and add Phase 2+ features
+**Tasks**:
+- [ ] Draft mode (default for new modules)
+- [ ] Publish action (makes module available)
+- [ ] Deactivate action (hides from users, preserves data)
+- [ ] Archive action (soft delete)
+- [ ] Status badges (Draft, Active, Inactive, Archived)
+
+**Acceptance Criteria**:
+- Only published modules appear in navigation
+- Deactivated modules preserve existing data
+- Status changes are confirmed with dialogs
+
+---
+
+### 3.2 Module Permissions ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] View permission (who can see records)
+- [ ] Create permission
+- [ ] Edit permission
+- [ ] Delete permission
+- [ ] Per-field visibility permissions
+
+**Acceptance Criteria**:
+- Permissions integrate with existing permission system
+- Field-level permissions respected in forms and views
+
+---
+
+### 3.3 Module Settings ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] Record naming template (e.g., "{first_name} {last_name}")
+- [ ] Default sort field and direction
+- [ ] Records per page default
+- [ ] Enable/disable features:
+  - Comments
+  - Attachments
+  - Activity timeline
+  - Tags
+  - Related records
+
+**Acceptance Criteria**:
+- Settings affect module behavior throughout app
+- Record names display correctly in lists and lookups
+
+---
+
+## Phase 4: DataTable Integration
+
+**Priority**: Critical
+**Estimated Time**: 6-8 hours
+
+### 4.1 Auto-Generate DataTable Views ⬜
+**Time**: 3 hours
+
+**Tasks**:
+- [ ] Create default view on module publish
+- [ ] Auto-generate columns from fields
+- [ ] Set column types based on field types
+- [ ] Configure default filters per field type
+- [ ] Set default sorting
+- [ ] Hide sensitive fields by default
+
+**Acceptance Criteria**:
+- Publishing module creates usable DataTable view
+- All fields are accessible in column selector
+- Default view is sensible and useful
+
+---
+
+### 4.2 Module Record Views (CRUD) ⬜
+**Time**: 4 hours
+
+**Tasks**:
+- [ ] Index view with DataTable
+  - Route: `/modules/{moduleApiName}`
+  - Uses DataTable component
+  - Shows all records with filtering/sorting/pagination
+  - Bulk operations available
+- [ ] Create view with dynamic form
+  - Route: `/modules/{moduleApiName}/create`
+  - Renders blocks and fields from module definition
+  - Validation based on field rules
+- [ ] Edit view with dynamic form
+  - Route: `/modules/{moduleApiName}/{id}/edit`
+  - Pre-populates with existing data
+  - Shows modified fields
+- [ ] Show/Detail view
+  - Route: `/modules/{moduleApiName}/{id}`
+  - Read-only field display
+  - Related records section
+  - Activity timeline
+
+**Files to Create/Update**:
+- `resources/js/pages/modules/Index.svelte`
+- `resources/js/pages/modules/Create.svelte`
+- `resources/js/pages/modules/Edit.svelte`
+- `resources/js/pages/modules/Show.svelte`
+- `app/Http/Controllers/ModuleViewController.php`
+
+**Acceptance Criteria**:
+- All CRUD views work for any module
+- Forms render correctly based on module definition
+- Validation works as configured
+- DataTable shows all records properly
+
+---
+
+### 4.3 Dynamic Form Rendering ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] Create `DynamicForm.svelte` component
+  - Accepts module definition as prop
+  - Renders blocks and fields
+  - Handles validation
+  - Emits form data on submit
+- [ ] Create `DynamicField.svelte` component
+  - Routes to correct field component based on type
+  - Handles all field types
+  - Applies validation rules
+  - Shows errors inline
+
+**Acceptance Criteria**:
+- Forms render all field types correctly
+- Multi-column layouts work
+- Conditional fields show/hide properly
+- Validation errors display inline
+
+---
+
+## Phase 5: Advanced Features
+
+**Priority**: Medium
+**Estimated Time**: 12-16 hours
+
+### 5.1 Relationship Fields (Lookup) ⬜
+**Time**: 6 hours
+
+**Tasks**:
+- [ ] Add "Lookup" field type
+- [ ] Select target module
+- [ ] Define relationship type (one-to-many, many-to-many)
+- [ ] Configure display field (which field to show in dropdown)
+- [ ] Filter related records
+- [ ] Cascading deletes configuration
+- [ ] Lookup field UI component with search
+- [ ] Display related records on detail view
+
+**Acceptance Criteria**:
+- Can create relationships between modules
+- Lookup fields show searchable dropdown
+- Related records display on record detail page
+
+---
+
+### 5.2 Formula Fields ⬜
+**Time**: 4 hours
+
+**Tasks**:
+- [ ] Add "Formula" field type
+- [ ] Formula editor with syntax highlighting
+- [ ] Support basic operations (+, -, *, /, %)
+- [ ] Field references (e.g., {lifetime_value} / {interactions_count})
+- [ ] Functions (SUM, AVG, COUNT, IF, DATE, etc.)
+- [ ] Real-time formula validation
+- [ ] Auto-calculate on record save
+- [ ] Display calculated values (read-only)
+
+**Acceptance Criteria**:
+- Formulas calculate correctly
+- Formulas update when dependent fields change
+- Formula errors are caught and displayed
+
+---
+
+### 5.3 Conditional Logic ⬜
+**Time**: 3 hours
+
+**Tasks**:
+- [ ] Show/hide fields based on other field values
+- [ ] Required field conditions
+- [ ] Default value formulas
+- [ ] Validation rule conditions
+- [ ] Visual condition builder
+
+**Acceptance Criteria**:
+- Fields show/hide based on conditions
+- Validation rules apply conditionally
+- Conditions work in create and edit modes
+
+---
+
+### 5.4 Field Duplication & Templates ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] Duplicate existing field
+- [ ] Save field as template
+- [ ] Field library of common fields
+- [ ] Apply field template to module
+
+**Acceptance Criteria**:
+- Fields can be duplicated quickly
+- Templates reduce repetitive configuration
+- Field library has useful defaults
+
+---
+
+### 5.5 Import/Export Module Definitions ⬜
+**Time**: 3 hours
+
+**Tasks**:
+- [ ] Export module as JSON
+- [ ] Import module from JSON
+- [ ] Module marketplace/templates
+- [ ] Clone module within tenant
+
+**Acceptance Criteria**:
+- Modules can be exported and imported
+- Templates can be shared between tenants
+- Cloning preserves all settings
+
+---
+
+## Phase 6: Polish & UX Improvements
+
+**Priority**: Medium
+**Estimated Time**: 6-8 hours
+
+### 6.1 Keyboard Shortcuts ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] Cmd/Ctrl + S to save
+- [ ] Cmd/Ctrl + Z to undo
+- [ ] Cmd/Ctrl + Shift + Z to redo
+- [ ] Delete key to remove selected field
+- [ ] Arrow keys to navigate fields
+- [ ] Shortcuts help modal
+
+**Acceptance Criteria**:
+- Common shortcuts work throughout builder
+- Shortcuts don't conflict with browser defaults
+
+---
+
+### 6.2 Undo/Redo System ⬜
+**Time**: 3 hours
+
+**Tasks**:
+- [ ] Track module structure changes
+- [ ] Undo button (with history dropdown)
+- [ ] Redo button
+- [ ] Change history visualization
+- [ ] Limit history to last 50 changes
+
+**Acceptance Criteria**:
+- Can undo field additions, deletions, edits
+- Can redo undone changes
+- History persists during edit session
+
+---
+
+### 6.3 Improved Visual Design ⬜
+**Time**: 3 hours
+
+**Tasks**:
+- [ ] Field type icons
+- [ ] Color-coded field categories
+- [ ] Drag preview improvements
+- [ ] Empty state illustrations
+- [ ] Loading states
+- [ ] Success/error animations
+- [ ] Tooltips for all actions
+
+**Acceptance Criteria**:
+- UI is visually polished
+- Drag operations feel smooth
+- Empty states guide user actions
+
+---
+
+## Phase 7: Testing & Documentation
+
+**Priority**: High
+**Estimated Time**: 8-10 hours
+
+### 7.1 Browser Tests ⬜
+**Time**: 5 hours
+
+**Tests to Write**:
+- [ ] Create new module
+- [ ] Add fields of each type
+- [ ] Reorder fields via drag-and-drop
+- [ ] Configure field settings
+- [ ] Publish module
+- [ ] Create record using new module
+- [ ] Edit record
+- [ ] Delete record
+- [ ] Bulk operations on module records
+- [ ] Module deactivation
+- [ ] Module deletion
+
+**File**: `tests/browser/module-builder.spec.ts`
+
+---
+
+### 7.2 Integration Tests ⬜
+**Time**: 3 hours
+
+**Tests to Write**:
+- [ ] Module service creates module with blocks
+- [ ] Field validation rules enforcement
+- [ ] Record creation with all field types
+- [ ] Relationship field linking
+- [ ] Formula field calculations
+- [ ] Conditional field logic
+
+**Files**: `tests/Feature/ModuleBuilder/*.php`
+
+---
+
+### 7.3 User Documentation ⬜
+**Time**: 2 hours
+
+**Tasks**:
+- [ ] Module Builder user guide
+- [ ] Field types reference
+- [ ] Best practices guide
+- [ ] Video tutorial (optional)
+- [ ] In-app help tooltips
+
+**Acceptance Criteria**:
+- Documentation covers all features
+- Examples provided for common use cases
+
+---
+
+## Success Criteria
+
+The Module Builder is complete when:
+
+1. ✅ User can create a new module from scratch
+2. ✅ User can add all field types
+3. ✅ User can configure field-specific settings
+4. ✅ User can arrange fields in multi-column layouts
+5. ✅ User can preview the form before publishing
+6. ✅ User can publish module to make it available
+7. ✅ Published modules generate DataTable views
+8. ✅ Published modules have working CRUD interfaces
+9. ✅ Users can create/edit/delete records via dynamic forms
+10. ✅ Relationship fields link modules together
+11. ✅ Formula fields calculate automatically
+12. ✅ Conditional logic shows/hides fields dynamically
+13. ✅ All features have browser tests
+14. ✅ User documentation is complete
+
+---
+
+## Integration Points
+
+### With DataTable System
+- Module fields → DataTable columns
+- Field types → Column types and filters
+- Module settings → Default table configuration
+- Bulk operations work on module records
+
+### With Existing Systems
+- Permission system → Module-level permissions
+- User preferences → Module-specific preferences
+- Activity tracking → Record audit log
+- Search → Module records indexed
+- Export → Module records exportable
+
+---
+
+## Timeline Estimate
+
+**Phase 1**: Field Configuration UI - 10 hours
+**Phase 2**: Preview & Testing - 8 hours
+**Phase 3**: Activation & Publishing - 6 hours
+**Phase 4**: DataTable Integration - 8 hours
+**Phase 5**: Advanced Features - 16 hours
+**Phase 6**: Polish & UX - 8 hours
+**Phase 7**: Testing & Documentation - 10 hours
+
+**Total**: ~66 hours (~8-9 working days)
+
+**Recommended Approach**:
+- Complete Phases 1-4 first (core functionality)
+- Test with real use cases
+- Add Phase 5 features based on priority
+- Polish in Phase 6
+- Comprehensive testing in Phase 7
+
+---
+
+## Current Status Summary
+
+**Completed**:
+- ✅ Basic module creation
+- ✅ Backend services and repositories
+- ✅ Domain-driven architecture
+- ✅ Drag-and-drop UI foundation
+
+**In Progress**:
+- ⬜ Field configuration panel
+- ⬜ Field type-specific settings
+- ⬜ Preview mode
+
+**Not Started**:
+- ⬜ Publishing workflow
+- ⬜ Dynamic form rendering
+- ⬜ Relationship fields
+- ⬜ Formula fields
+- ⬜ Testing suite
+
+**Blockers**: None identified
+
+**Next Step**: Begin Phase 1.1 - Field Type Selector & Configuration Panel

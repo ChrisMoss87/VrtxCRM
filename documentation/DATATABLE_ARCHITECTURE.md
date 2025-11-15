@@ -1,4 +1,4 @@
-# Advanced DataTable Architecture
+all# Advanced DataTable Architecture
 
 **Created**: 2025-11-12
 **Status**: Planning Phase

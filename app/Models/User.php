@@ -38,20 +38,6 @@ final class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'preferences' => 'array',
-        ];
-    }
-
-    /**
      * Get the default view ID for a specific module.
      */
     public function getDefaultViewForModule(string $module): ?int
@@ -79,5 +65,19 @@ final class User extends Authenticatable
         unset($preferences['default_views'][$module]);
         $this->preferences = $preferences;
         $this->save();
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'preferences' => 'array',
+        ];
     }
 }

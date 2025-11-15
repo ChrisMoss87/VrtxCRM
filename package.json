@@ -76,6 +76,7 @@
         "date-fns": "^4.1.0",
         "jspdf": "^3.0.3",
         "papaparse": "^5.5.3",
+        "svelte-dnd-action": "^0.9.67",
         "xlsx": "^0.18.5"
     }
 }

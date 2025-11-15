@@ -15,9 +15,8 @@ final class Field
 
     public function __construct(
         private ?int $id,
-        private int $moduleId,
-        private ?int $blockId,
-        private string $name,
+        private int $blockId,
+        private string $label,
         private string $apiName,
         private FieldType $type,
         private ?string $description,
@@ -25,8 +24,6 @@ final class Field
         private bool $isRequired,
         private bool $isUnique,
         private bool $isSearchable,
-        private bool $isVisibleInList,
-        private bool $isVisibleInDetail,
         private ValidationRules $validationRules,
         private FieldSettings $settings,
         private ?string $defaultValue,
@@ -37,35 +34,32 @@ final class Field
     ) {}
 
     public static function create(
-        int $moduleId,
-        ?int $blockId,
-        string $name,
+        int $blockId,
+        string $label,
         string $apiName,
         FieldType $type,
         ?string $description = null,
         ?string $helpText = null,
         bool $isRequired = false,
         bool $isUnique = false,
+        bool $isSearchable = false,
         ?ValidationRules $validationRules = null,
         ?FieldSettings $settings = null,
         ?string $defaultValue = null,
         int $order = 0,
-        int $width = 50
+        int $width = 100
     ): self {
         return new self(
             id: null,
-            moduleId: $moduleId,
             blockId: $blockId,
-            name: $name,
+            label: $label,
             apiName: $apiName,
             type: $type,
             description: $description,
             helpText: $helpText,
             isRequired: $isRequired,
             isUnique: $isUnique,
-            isSearchable: true,
-            isVisibleInList: true,
-            isVisibleInDetail: true,
+            isSearchable: $isSearchable,
             validationRules: $validationRules ?? ValidationRules::empty(),
             settings: $settings ?? FieldSettings::default(),
             defaultValue: $defaultValue,
@@ -81,13 +75,13 @@ final class Field
     }
 
     public function updateDetails(
-        string $name,
+        string $label,
         string $apiName,
         FieldType $type,
         ?string $description,
         ?string $helpText
     ): void {
-        $this->name = $name;
+        $this->label = $label;
         $this->apiName = $apiName;
         $this->type = $type;
         $this->description = $description;
@@ -97,21 +91,13 @@ final class Field
     public function updateValidation(
         bool $isRequired,
         bool $isUnique,
+        bool $isSearchable,
         ValidationRules $rules
     ): void {
         $this->isRequired = $isRequired;
         $this->isUnique = $isUnique;
-        $this->validationRules = $rules;
-    }
-
-    public function updateVisibility(
-        bool $isVisibleInList,
-        bool $isVisibleInDetail,
-        bool $isSearchable
-    ): void {
-        $this->isVisibleInList = $isVisibleInList;
-        $this->isVisibleInDetail = $isVisibleInDetail;
         $this->isSearchable = $isSearchable;
+        $this->validationRules = $rules;
     }
 
     public function updateSettings(FieldSettings $settings): void
@@ -131,19 +117,14 @@ final class Field
         return $this->id;
     }
 
-    public function moduleId(): int
-    {
-        return $this->moduleId;
-    }
-
-    public function blockId(): ?int
+    public function blockId(): int
     {
         return $this->blockId;
     }
 
-    public function name(): string
+    public function label(): string
     {
-        return $this->name;
+        return $this->label;
     }
 
     public function apiName(): string
@@ -179,16 +160,6 @@ final class Field
     public function isSearchable(): bool
     {
         return $this->isSearchable;
-    }
-
-    public function isVisibleInList(): bool
-    {
-        return $this->isVisibleInList;
-    }
-
-    public function isVisibleInDetail(): bool
-    {
-        return $this->isVisibleInDetail;
     }
 
     public function validationRules(): ValidationRules

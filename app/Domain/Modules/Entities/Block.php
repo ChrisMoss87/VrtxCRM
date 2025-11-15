@@ -14,34 +14,28 @@ final class Block
     public function __construct(
         private ?int $id,
         private int $moduleId,
-        private string $name,
+        private string $label,
         private BlockType $type,
         private int $order,
-        private int $columns,
-        private bool $isCollapsible,
-        private bool $isCollapsedByDefault,
+        private array $settings,
         private DateTimeImmutable $createdAt,
         private ?DateTimeImmutable $updatedAt = null,
     ) {}
 
     public static function create(
         int $moduleId,
-        string $name,
+        string $label,
         BlockType $type = BlockType::SECTION,
         int $order = 0,
-        int $columns = 2,
-        bool $isCollapsible = false,
-        bool $isCollapsedByDefault = false
+        array $settings = []
     ): self {
         return new self(
             id: null,
             moduleId: $moduleId,
-            name: $name,
+            label: $label,
             type: $type,
             order: $order,
-            columns: $columns,
-            isCollapsible: $isCollapsible,
-            isCollapsedByDefault: $isCollapsedByDefault,
+            settings: $settings,
             createdAt: new DateTimeImmutable,
         );
     }
@@ -52,17 +46,13 @@ final class Block
     }
 
     public function updateDetails(
-        string $name,
+        string $label,
         BlockType $type,
-        int $columns,
-        bool $isCollapsible,
-        bool $isCollapsedByDefault
+        array $settings
     ): void {
-        $this->name = $name;
+        $this->label = $label;
         $this->type = $type;
-        $this->columns = $columns;
-        $this->isCollapsible = $isCollapsible;
-        $this->isCollapsedByDefault = $isCollapsedByDefault;
+        $this->settings = $settings;
     }
 
     public function updateOrder(int $order): void
@@ -81,9 +71,9 @@ final class Block
         return $this->moduleId;
     }
 
-    public function name(): string
+    public function label(): string
     {
-        return $this->name;
+        return $this->label;
     }
 
     public function type(): BlockType
@@ -96,19 +86,9 @@ final class Block
         return $this->order;
     }
 
-    public function columns(): int
+    public function settings(): array
     {
-        return $this->columns;
-    }
-
-    public function isCollapsible(): bool
-    {
-        return $this->isCollapsible;
-    }
-
-    public function isCollapsedByDefault(): bool
-    {
-        return $this->isCollapsedByDefault;
+        return $this->settings;
     }
 
     public function fields(): array

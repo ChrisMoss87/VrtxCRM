@@ -36,6 +36,6 @@ export default defineConfig({
         headers: {
             'Access-Control-Allow-Origin': '*', // this is only for the local dev server so it can allow all
         },
-        allowedHosts: ['harmony.local'],
+        allowedHosts: ['*.vrtxcrm.local'],
     },
 });

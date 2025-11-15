@@ -2,7 +2,10 @@
 	import { getContext } from 'svelte';
 	import { Button } from '@/components/ui/button';
 	import { Input } from '@/components/ui/input';
+	import * as AlertDialog from '@/components/ui/alert-dialog';
 	import { Search, X, Download, Trash2, Tag } from 'lucide-svelte';
+	import { toast } from 'svelte-sonner';
+	import axios from 'axios';
 	import type { TableContext } from './types';
 	import DataTableViewSwitcher from './DataTableViewSwitcher.svelte';
 	import DataTableColumnToggle from './DataTableColumnToggle.svelte';
@@ -40,6 +43,8 @@
 	let searchValue = $state(table.state.globalFilter);
 	let currentView = $state<any>(null);
 	let saveViewDialogOpen = $state(false);
+	let deleteDialogOpen = $state(false);
+	let isDeleting = $state(false);
 
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
@@ -100,6 +105,41 @@
 			columnVisibility: table.state.columnVisibility,
 			pageSize: table.state.pagination.perPage
 		};
+	}
+
+	async function handleBulkDelete() {
+		if (!module) return;
+
+		isDeleting = true;
+
+		try {
+			// Get selected row IDs
+			const selectedIds = Object.keys(table.state.rowSelection)
+				.filter((id) => table.state.rowSelection[id])
+				.map((id) => parseInt(id));
+
+			// Call bulk delete API
+			const response = await axios.post(`/api/modules/${module}/records/bulk-delete`, {
+				ids: selectedIds
+			});
+
+			// Show success message
+			toast.success(response.data.message || `Deleted ${selectedIds.length} record(s)`);
+
+			// Clear selection
+			table.clearSelection();
+
+			// Refresh table data
+			await table.refresh();
+
+			// Close dialog
+			deleteDialogOpen = false;
+		} catch (error: any) {
+			console.error('Bulk delete error:', error);
+			toast.error(error.response?.data?.message || 'Failed to delete records');
+		} finally {
+			isDeleting = false;
+		}
 	}
 </script>
 
@@ -189,7 +229,7 @@
 						Export
 					</Button>
 
-					<Button variant="destructive" size="sm">
+					<Button variant="destructive" size="sm" onclick={() => (deleteDialogOpen = true)}>
 						<Trash2 class="mr-2 h-4 w-4" />
 						Delete
 					</Button>
@@ -213,4 +253,24 @@
 			currentView = null;
 		}}
 	/>
+
+	<AlertDialog.Root bind:open={deleteDialogOpen}>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Delete {selectedCount} record{selectedCount === 1 ? '' : 's'}?</AlertDialog.Title>
+				<AlertDialog.Description>
+					This action cannot be undone. This will permanently delete the selected record{selectedCount ===
+					1
+						? ''
+						: 's'} from the database.
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+				<AlertDialog.Action onclick={handleBulkDelete} disabled={isDeleting}>
+					{isDeleting ? 'Deleting...' : 'Delete'}
+				</AlertDialog.Action>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
 {/if}
