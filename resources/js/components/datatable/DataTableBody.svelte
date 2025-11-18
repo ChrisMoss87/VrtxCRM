@@ -3,6 +3,7 @@
 	import { Checkbox } from '@/components/ui/checkbox';
 	import { Loader2 } from 'lucide-svelte';
 	import { getNestedValue, formatCellValue } from './utils';
+	import EditableCell from './EditableCell.svelte';
 	import type { ColumnDef, TableContext } from './types';
 
 	interface Props {
@@ -11,7 +12,10 @@
 		loading?: boolean;
 		error?: string | null;
 		enableSelection?: boolean;
+		enableInlineEdit?: boolean;
+		moduleApiName: string;
 		onRowClick?: (row: any) => void;
+		onCellUpdate?: (recordId: string, field: string, value: any) => Promise<void>;
 	}
 
 	let {
@@ -20,7 +24,10 @@
 		loading = false,
 		error = null,
 		enableSelection = true,
-		onRowClick
+		enableInlineEdit = true,
+		moduleApiName,
+		onRowClick,
+		onCellUpdate
 	}: Props = $props();
 
 	const table = getContext<TableContext>('table');
@@ -29,6 +36,16 @@
 		if (onRowClick) {
 			onRowClick(row);
 		}
+	}
+
+	// Check if column is editable
+	function isColumnEditable(column: ColumnDef): boolean {
+		// Don't allow editing if custom cell renderer is used
+		if (column.cell) return false;
+
+		// Allow editing for these types
+		const editableTypes = ['text', 'email', 'phone', 'url', 'number', 'decimal', 'date', 'datetime'];
+		return editableTypes.includes(column.type || 'text');
 	}
 </script>
 
@@ -92,13 +109,23 @@
 						? column.format(value, row)
 						: formatCellValue(value, column.type)}
 					{@const cellClass = column.cellClass ? column.cellClass(value, row) : ''}
+					{@const editable = enableInlineEdit && isColumnEditable(column)}
 
 					<td class="px-4 py-3 align-middle {cellClass}">
 						{#if column.cell}
 							<!-- Custom cell component -->
 							<svelte:component this={column.cell} {value} {row} {column} {index} />
+						{:else if editable}
+							<!-- Editable cell with inline editing -->
+							<EditableCell
+								{value}
+								{row}
+								{column}
+								{moduleApiName}
+								onUpdate={onCellUpdate}
+							/>
 						{:else}
-							<!-- Default cell rendering -->
+							<!-- Default cell rendering (non-editable) -->
 							<div class="flex items-center">
 								{#if column.type === 'boolean'}
 									<div

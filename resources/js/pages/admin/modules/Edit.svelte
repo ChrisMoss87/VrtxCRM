@@ -6,7 +6,7 @@
 	import { Textarea } from '@/components/ui/textarea';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 	import { Switch } from '@/components/ui/switch';
-	import { Tabs } from '@/components/ui/tabs';
+    import * as Tabs from '@/components/ui/tabs/index.js';
 	import AppLayout from '@/layouts/app/AppSidebarLayout.svelte';
 	import {
 		ArrowLeft,
@@ -33,12 +33,21 @@
 		Wrench,
 		Lightbulb,
 		Bell,
-		FileText
+		FileText,
+		Undo2,
+		Redo2
 	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { ComponentType } from 'svelte';
 	import { dndzone } from 'svelte-dnd-action';
 	import type { DndEvent } from 'svelte-dnd-action';
+	import { validateModule, type ValidationResult } from '@/lib/module-validation';
+	import ValidationPanel from '@/components/modules/ValidationPanel.svelte';
+	import ModulePreview from '@/components/modules/ModulePreview.svelte';
+	import FieldTemplatePicker from '@/components/modules/FieldTemplatePicker.svelte';
+	import type { FieldTemplate } from '@/lib/field-templates';
+	import * as Resizable from '@/components/ui/resizable';
+	import { UndoRedoManager } from '@/lib/undo-redo';
 
 	interface FieldOption {
 		id?: number;
@@ -109,6 +118,29 @@
 	let blocks = $state<Block[]>(JSON.parse(JSON.stringify(module.blocks)));
 	let savingStructure = $state(false);
 	let activeTab = $state('basic');
+	let validationResult = $state<ValidationResult | null>(null);
+	let showValidation = $state(false);
+	let showPreview = $state(true);
+	let showTemplatePicker = $state(false);
+	let templatePickerBlockIndex = $state<number | null>(null);
+
+	// Undo/Redo state
+	const undoRedoManager = new UndoRedoManager<Block[]>(50);
+	let canUndo = $state(false);
+	let canRedo = $state(false);
+
+	// Initialize undo/redo manager with initial state
+	$effect(() => {
+		if (undoRedoManager.getCurrentIndex() === -1) {
+			undoRedoManager.push(blocks, 'Initial state');
+			updateUndoRedoState();
+		}
+	});
+
+	function updateUndoRedoState() {
+		canUndo = undoRedoManager.canUndo();
+		canRedo = undoRedoManager.canRedo();
+	}
 
 	// Common icons for modules
 	const commonIcons: Array<{ name: string; component: ComponentType }> = [
@@ -143,6 +175,70 @@
 	function handleCancel() {
 		router.visit('/admin/modules');
 	}
+
+	// Undo/Redo handlers
+	function handleUndo() {
+		const previousState = undoRedoManager.undo();
+		if (previousState !== null) {
+			blocks = previousState;
+			updateUndoRedoState();
+			toast.info('Undid change');
+		}
+	}
+
+	function handleRedo() {
+		const nextState = undoRedoManager.redo();
+		if (nextState !== null) {
+			blocks = nextState;
+			updateUndoRedoState();
+			toast.info('Redid change');
+		}
+	}
+
+	// Keyboard shortcuts
+	function handleKeyDown(e: KeyboardEvent) {
+		// Cmd/Ctrl + S to save
+		if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+			e.preventDefault();
+			if (activeTab === 'basic') {
+				handleSaveBasic();
+			} else if (activeTab === 'fields') {
+				handleSaveStructure();
+			}
+		}
+
+		// Cmd/Ctrl + Z to undo
+		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
+			e.preventDefault();
+			handleUndo();
+		}
+
+		// Cmd/Ctrl + Shift + Z or Cmd/Ctrl + Y to redo
+		if (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') ||
+		    ((e.metaKey || e.ctrlKey) && e.key === 'y')) {
+			e.preventDefault();
+			handleRedo();
+		}
+
+		// Cmd/Ctrl + Shift + V to validate
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'v') {
+			e.preventDefault();
+			handleValidate();
+		}
+
+		// Cmd/Ctrl + Shift + P to toggle preview
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+			e.preventDefault();
+			showPreview = !showPreview();
+		}
+	}
+
+	$effect(() => {
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	});
 
 	async function handleSaveBasic() {
 		try {
@@ -189,11 +285,15 @@
 				fields: []
 			}
 		];
+		undoRedoManager.push(blocks, 'Add block');
+		updateUndoRedoState();
 	}
 
 	function removeBlock(index: number) {
 		if (confirm('Are you sure you want to delete this block and all its fields?')) {
 			blocks = blocks.filter((_, i) => i !== index);
+			undoRedoManager.push(blocks, 'Delete block');
+			updateUndoRedoState();
 		}
 	}
 
@@ -219,12 +319,37 @@
 			}
 		];
 		blocks = [...blocks]; // Trigger reactivity
+		undoRedoManager.push(blocks, 'Add field');
+		updateUndoRedoState();
+	}
+
+	function openTemplatePicker(blockIndex: number) {
+		templatePickerBlockIndex = blockIndex;
+		showTemplatePicker = true;
+	}
+
+	function handleTemplateSelect(template: FieldTemplate) {
+		if (templatePickerBlockIndex === null) return;
+
+		const block = blocks[templatePickerBlockIndex];
+		const newField = {
+			...template.field,
+			order: block.fields.length,
+		};
+
+		block.fields = [...block.fields, newField];
+		blocks = [...blocks]; // Trigger reactivity
+		undoRedoManager.push(blocks, `Add ${template.name}`);
+		updateUndoRedoState();
+		templatePickerBlockIndex = null;
 	}
 
 	function removeField(blockIndex: number, fieldIndex: number) {
 		if (confirm('Are you sure you want to delete this field?')) {
 			blocks[blockIndex].fields = blocks[blockIndex].fields.filter((_, i) => i !== fieldIndex);
 			blocks = [...blocks]; // Trigger reactivity
+			undoRedoManager.push(blocks, 'Delete field');
+			updateUndoRedoState();
 		}
 	}
 
@@ -242,6 +367,11 @@
 		blocks.forEach((block, index) => {
 			block.order = index;
 		});
+		// Only push to history on finalize
+		if (e.type === 'finalize') {
+			undoRedoManager.push(blocks, 'Reorder blocks');
+			updateUndoRedoState();
+		}
 	}
 
 	// Drag and drop handlers for fields
@@ -252,9 +382,43 @@
 			field.order = index;
 		});
 		blocks = [...blocks]; // Trigger reactivity
+		// Only push to history on finalize
+		if (e.type === 'finalize') {
+			undoRedoManager.push(blocks, 'Reorder fields');
+			updateUndoRedoState();
+		}
+	}
+
+	function handleValidate() {
+		const moduleToValidate: any = {
+			...module,
+			blocks
+		};
+		validationResult = validateModule(moduleToValidate);
+		showValidation = true;
+
+		if (validationResult.valid) {
+			toast.success('Validation passed! Module is ready to publish.');
+		} else {
+			toast.error(`Found ${validationResult.errors.length} error(s). Please fix them before saving.`);
+		}
 	}
 
 	async function handleSaveStructure() {
+		// Validate before saving
+		const moduleToValidate: any = {
+			...module,
+			blocks
+		};
+		const result = validateModule(moduleToValidate);
+
+		if (!result.valid) {
+			validationResult = result;
+			showValidation = true;
+			toast.error(`Cannot save: Found ${result.errors.length} validation error(s)`);
+			return;
+		}
+
 		savingStructure = true;
 
 		try {
@@ -276,6 +440,8 @@
 			}
 
 			toast.success('Fields and blocks saved successfully!');
+			showValidation = false;
+			validationResult = null;
 			router.reload({ only: ['module'] });
 		} catch (error) {
 			console.error('Failed to save structure:', error);
@@ -284,6 +450,7 @@
 			savingStructure = false;
 		}
 	}
+    console.log(module)
 </script>
 
 <svelte:head>
@@ -351,12 +518,12 @@
 									<Label for="name">Module Name *</Label>
 									<Input
 										id="name"
-										bind:value={basicForm.data.name}
+										bind:value={basicForm.name}
 										placeholder="e.g., Projects, Leads, Invoices"
 										required
 										disabled={module.is_system}
 									/>
-									{#if basicForm.errors.name}
+									{#if basicForm.errors?.name}
 										<p class="text-sm text-destructive">{basicForm.errors.name}</p>
 									{/if}
 								</div>
@@ -366,12 +533,12 @@
 									<Label for="singular_name">Singular Name *</Label>
 									<Input
 										id="singular_name"
-										bind:value={basicForm.data.singular_name}
+										bind:value={basicForm.singular_name}
 										placeholder="e.g., Project, Lead, Invoice"
 										required
 										disabled={module.is_system}
 									/>
-									{#if basicForm.errors.singular_name}
+									{#if basicForm.errors?.singular_name}
 										<p class="text-sm text-destructive">{basicForm.errors.singular_name}</p>
 									{/if}
 								</div>
@@ -394,10 +561,10 @@
 												{@const IconComp = iconOption.component}
 												<button
 													type="button"
-													onclick={() => (basicForm.data.icon = iconOption.name)}
+													onclick={() => (basicForm.icon = iconOption.name)}
 													class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center transition-colors"
-													class:bg-accent={basicForm.data.icon === iconOption.name}
-													class:text-accent-foreground={basicForm.data.icon === iconOption.name}
+													class:bg-accent={basicForm.icon === iconOption.name}
+													class:text-accent-foreground={basicForm.icon === iconOption.name}
 													title={iconOption.name}
 												>
 													<IconComp class="h-5 w-5" />
@@ -413,7 +580,7 @@
 									<Label for="description">Description</Label>
 									<Textarea
 										id="description"
-										bind:value={basicForm.data.description}
+										bind:value={basicForm.description}
 										placeholder="What is this module used for?"
 										rows={3}
 									/>
@@ -429,7 +596,7 @@
 											Inactive modules are hidden from users
 										</p>
 									</div>
-									<Switch id="is_active" bind:checked={basicForm.data.is_active} />
+									<Switch id="is_active" bind:checked={$basicForm.is_active} />
 								</div>
 							</CardContent>
 						</Card>
@@ -460,8 +627,62 @@
 
 			<!-- Fields & Blocks Tab -->
 			<Tabs.Content value="fields">
-				<div class="space-y-6 py-6">
-					<!-- Blocks List -->
+				<div class="py-6">
+					<!-- Validation Panel -->
+					{#if showValidation && validationResult}
+						<div class="mb-6">
+							<ValidationPanel
+								result={validationResult}
+								onClose={() => (showValidation = false)}
+							/>
+						</div>
+					{/if}
+
+					<!-- Header with Preview Toggle and Undo/Redo -->
+					<div class="flex items-center justify-between mb-6">
+						<h3 class="text-lg font-semibold">Fields & Blocks</h3>
+						<div class="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={handleUndo}
+								disabled={!canUndo || module.is_system}
+								title="Undo (Ctrl/Cmd+Z)"
+							>
+								<Undo2 class="h-4 w-4" />
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={handleRedo}
+								disabled={!canRedo || module.is_system}
+								title="Redo (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)"
+							>
+								<Redo2 class="h-4 w-4" />
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={handleValidate}
+								disabled={module.is_system}
+							>
+								Validate
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => (showPreview = !showPreview)}
+							>
+								{showPreview ? 'Hide' : 'Show'} Preview
+							</Button>
+						</div>
+					</div>
+
+					<!-- Split View: Builder + Preview -->
+					<Resizable.PaneGroup direction="horizontal" class="min-h-[600px]">
+						<Resizable.Pane defaultSize={showPreview ? 50 : 100} minSize={30}>
+							<div class="pr-4 space-y-6 h-full overflow-auto">
+								<!-- Blocks List -->
 					{#if blocks.length === 0}
 						<Card class="border-dashed">
 							<CardContent
@@ -511,6 +732,14 @@
 												</div>
 											</div>
 											<div class="flex items-center gap-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onclick={() => openTemplatePicker(blockIndex)}
+													disabled={module.is_system}
+												>
+													Browse Templates
+												</Button>
 												<Button
 													variant="outline"
 													size="sm"
@@ -859,26 +1088,38 @@
 						</Button>
 					{/if}
 
-					<!-- Save Button for Fields -->
-					{#if blocks.length > 0}
-						<div class="flex items-center gap-4">
-							<Button
-								onclick={handleSaveStructure}
-								disabled={savingStructure || module.is_system}
-							>
-								{#if savingStructure}
-									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-									Saving...
-								{:else}
-									<Save class="mr-2 h-4 w-4" />
-									Save Fields & Blocks
+								<!-- Save Button for Fields -->
+								{#if blocks.length > 0}
+									<div class="flex items-center gap-4">
+										<Button
+											onclick={handleSaveStructure}
+											disabled={savingStructure || module.is_system}
+										>
+											{#if savingStructure}
+												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+												Saving...
+											{:else}
+												<Save class="mr-2 h-4 w-4" />
+												Save Fields & Blocks
+											{/if}
+										</Button>
+										<p class="text-sm text-muted-foreground">
+											Changes are validated automatically before saving
+										</p>
+									</div>
 								{/if}
-							</Button>
-							<p class="text-sm text-muted-foreground">
-								Save will persist all field and block changes
-							</p>
-						</div>
-					{/if}
+							</div>
+						</Resizable.Pane>
+
+						{#if showPreview}
+							<Resizable.Handle withHandle />
+							<Resizable.Pane defaultSize={50} minSize={30}>
+								<div class="pl-4 h-full">
+									<ModulePreview module={module} {blocks} />
+								</div>
+							</Resizable.Pane>
+						{/if}
+					</Resizable.PaneGroup>
 				</div>
 			</Tabs.Content>
 
@@ -898,4 +1139,10 @@
 			</Tabs.Content>
 		</Tabs.Root>
 	</div>
+
+	<!-- Field Template Picker Dialog -->
+	<FieldTemplatePicker
+		bind:open={showTemplatePicker}
+		onSelect={handleTemplateSelect}
+	/>
 </AppLayout>

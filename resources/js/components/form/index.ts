@@ -9,3 +9,8 @@ export { default as CurrencyField } from './CurrencyField.svelte';
 export { default as PercentField } from './PercentField.svelte';
 export { default as CheckboxField } from './CheckboxField.svelte';
 export { default as LookupField } from './LookupField.svelte';
+export { default as RadioField } from './RadioField.svelte';
+export { default as SwitchField } from './SwitchField.svelte';
+export { default as MultiselectField } from './MultiselectField.svelte';
+export { default as FileField } from './FileField.svelte';
+export { default as ImageField } from './ImageField.svelte';

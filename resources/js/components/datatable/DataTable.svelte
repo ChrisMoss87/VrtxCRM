@@ -40,10 +40,12 @@
 		enableBulkActions?: boolean;
 		enableColumnReorder?: boolean;
 		enableColumnResize?: boolean;
+		enableInlineEdit?: boolean;
 		class?: string;
 		onRowClick?: (row: any) => void;
 		onSelectionChange?: (rows: any[]) => void;
 		onBulkAction?: (action: string, rows: any[]) => void;
+		onCellUpdate?: (recordId: string, field: string, value: any) => Promise<void>;
 	}
 
 	let {
@@ -62,10 +64,12 @@
 		enableBulkActions = true,
 		enableColumnReorder = false,
 		enableColumnResize = false,
+		enableInlineEdit = true,
 		class: className = '',
 		onRowClick,
 		onSelectionChange,
-		onBulkAction
+		onBulkAction,
+		onCellUpdate
 	}: Props = $props();
 
 	// Generate columns from module if not provided
@@ -363,6 +367,24 @@
 			onRowClick(row);
 		}
 	}
+
+	// Handle cell update
+	async function handleCellUpdate(recordId: string, field: string, value: any) {
+		if (onCellUpdate) {
+			await onCellUpdate(recordId, field, value);
+		} else {
+			// Default implementation: call API endpoint
+			const response = await axios.patch(`/api/modules/${moduleApiName}/records/${recordId}`, {
+				[field]: value
+			});
+
+			// Update local state
+			const recordIndex = state.data.findIndex((r) => r.id === recordId);
+			if (recordIndex !== -1) {
+				state.data[recordIndex][field] = value;
+			}
+		}
+	}
 </script>
 
 <div class="space-y-4 {className}">
@@ -398,7 +420,10 @@
 					loading={state.loading}
 					error={state.error}
 					{enableSelection}
+					{enableInlineEdit}
+					{moduleApiName}
 					onRowClick={handleRowClick}
+					onCellUpdate={handleCellUpdate}
 				/>
 			</table>
 		</div>

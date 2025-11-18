@@ -72,6 +72,7 @@ Route::middleware([
 
             // Module record endpoints
             Route::get('modules/{moduleApiName}/records', [ModuleRecordController::class, 'index'])->name('api.modules.records.index');
+            Route::get('modules/{moduleApiName}/records/export', [ModuleRecordController::class, 'export'])->name('api.modules.records.export');
             Route::post('modules/{moduleApiName}/records', [ModuleRecordController::class, 'store'])->name('api.modules.records.store');
             Route::post('modules/{moduleApiName}/records/bulk-delete', [ModuleRecordController::class, 'bulkDelete'])->name('api.modules.records.bulk-delete');
             Route::post('modules/{moduleApiName}/records/bulk-update', [ModuleRecordController::class, 'bulkUpdate'])->name('api.modules.records.bulk-update');

@@ -3,7 +3,8 @@
 	import { Button } from '@/components/ui/button';
 	import { Input } from '@/components/ui/input';
 	import * as AlertDialog from '@/components/ui/alert-dialog';
-	import { Search, X, Download, Trash2, Tag } from 'lucide-svelte';
+	import * as DropdownMenu from '@/components/ui/dropdown-menu';
+	import { Search, X, Download, Trash2, Tag, FileSpreadsheet, FileText } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import axios from 'axios';
 	import type { TableContext } from './types';
@@ -11,6 +12,7 @@
 	import DataTableColumnToggle from './DataTableColumnToggle.svelte';
 	import DataTableSaveViewDialog from './DataTableSaveViewDialog.svelte';
 	import DataTableFilterChips from './DataTableFilterChips.svelte';
+	import { buildApiRequest } from './utils';
 
 	interface Props {
 		enableSearch?: boolean;
@@ -141,6 +143,49 @@
 			isDeleting = false;
 		}
 	}
+
+	function handleExport(format: 'xlsx' | 'csv') {
+		if (!module) return;
+
+		try {
+			// Build request params
+			const request = buildApiRequest(table.state);
+
+			// Build URL with query params
+			const params = new URLSearchParams();
+			params.set('format', format);
+
+			if (request.sort) {
+				params.set('sort', JSON.stringify(request.sort));
+			}
+
+			if (request.filters) {
+				params.set('filters', JSON.stringify(request.filters));
+			}
+
+			if (request.search) {
+				params.set('search', request.search);
+			}
+
+			// Get visible columns
+			const visibleColumns = Object.entries(table.state.columnVisibility)
+				.filter(([_, visible]) => visible)
+				.map(([columnId]) => columnId)
+				.filter((id) => id !== 'actions'); // Exclude actions column
+
+			if (visibleColumns.length > 0) {
+				params.set('columns', visibleColumns.join(','));
+			}
+
+			// Trigger download by navigating to export endpoint
+			window.location.href = `/api/modules/${module}/records/export?${params.toString()}`;
+
+			toast.success(`Exporting ${format.toUpperCase()} file...`);
+		} catch (error: any) {
+			console.error('Export error:', error);
+			toast.error('Failed to export data');
+		}
+	}
 </script>
 
 <div class="flex flex-col gap-2">
@@ -165,10 +210,24 @@
 			{/if}
 
 			{#if enableExport && selectedCount === 0}
-				<Button variant="outline" size="sm">
-					<Download class="mr-2 h-4 w-4" />
-					Export
-				</Button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger >
+						<Button variant="outline" size="sm" >
+							<Download class="mr-2 h-4 w-4" />
+							Export
+						</Button>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						<DropdownMenu.Item onclick={() => handleExport('xlsx')}>
+							<FileSpreadsheet class="mr-2 h-4 w-4" />
+							Export as Excel (.xlsx)
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={() => handleExport('csv')}>
+							<FileText class="mr-2 h-4 w-4" />
+							Export as CSV (.csv)
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			{/if}
 		</div>
 	</div>
@@ -224,10 +283,24 @@
 						Add tags
 					</Button>
 
-					<Button variant="outline" size="sm">
-						<Download class="mr-2 h-4 w-4" />
-						Export
-					</Button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger >
+							<Button variant="outline" size="sm" >
+								<Download class="mr-2 h-4 w-4" />
+								Export
+							</Button>
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end">
+							<DropdownMenu.Item onclick={() => handleExport('xlsx')}>
+								<FileSpreadsheet class="mr-2 h-4 w-4" />
+								Export as Excel (.xlsx)
+							</DropdownMenu.Item>
+							<DropdownMenu.Item onclick={() => handleExport('csv')}>
+								<FileText class="mr-2 h-4 w-4" />
+								Export as CSV (.csv)
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 
 					<Button variant="destructive" size="sm" onclick={() => (deleteDialogOpen = true)}>
 						<Trash2 class="mr-2 h-4 w-4" />

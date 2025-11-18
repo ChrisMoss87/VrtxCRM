@@ -34,24 +34,15 @@
 	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { ComponentType } from 'svelte';
+    import Debug from '@/components/Debug.svelte';
 
-	const form = useForm({
-		name: '',
+	let form = $state(useForm({
+		name: 'gdsfsfsdf',
 		singular_name: '',
 		icon: '',
 		description: '',
 		is_active: true
-	});
-
-	// Auto-generate singular name from name
-	$effect(() => {
-		if (form.data.name && !form.data.singular_name) {
-			// Remove trailing 's' if present
-			form.data.singular_name = form.data.name.endsWith('s')
-				? form.data.name.slice(0, -1)
-				: form.data.name;
-		}
-	});
+	}));
 
 	function handleCancel() {
 		router.visit('/admin/modules');
@@ -61,7 +52,7 @@
 
 	async function handleSave() {
 		saving = true;
-		form.clearErrors();
+		$form.clearErrors();
 
 		try {
 			const response = await fetch('/api/admin/modules', {
@@ -80,7 +71,7 @@
 				if (data.errors) {
 					// Set form errors
 					Object.keys(data.errors).forEach(key => {
-						form.setError(key, data.errors[key][0] || data.errors[key]);
+						$form.setError(key, data.errors[key][0] || data.errors[key]);
 					});
 					toast.error('Validation failed. Please check the form.');
 				} else {
@@ -128,6 +119,7 @@
 </svelte:head>
 
 <AppLayout>
+    <Debug data={ $form} />
 	<div class="flex flex-col gap-6 max-w-4xl">
 		<!-- Header -->
 		<div class="flex items-center gap-4">
@@ -153,18 +145,18 @@
 						</CardDescription>
 					</CardHeader>
 					<CardContent class="space-y-4">
-						<!-- Module Name -->
+						 Module Name
 						<div class="space-y-2">
 							<Label for="name">Module Name *</Label>
 							<Input
 								id="name"
-								bind:value={form.data.name}
+								bind:value={$form.name}
 								placeholder="e.g., Projects, Leads, Invoices"
 								required
 								autofocus
 							/>
-							{#if form.errors.name}
-								<p class="text-sm text-destructive">{form.errors.name}</p>
+							{#if form.errors?.name}
+								<p class="text-sm text-destructive">{$form.name}</p>
 							{/if}
 							<p class="text-xs text-muted-foreground">
 								The plural name displayed in navigation and lists
@@ -176,11 +168,11 @@
 							<Label for="singular_name">Singular Name *</Label>
 							<Input
 								id="singular_name"
-								bind:value={form.data.singular_name}
+								bind:value={$form.singular_name}
 								placeholder="e.g., Project, Lead, Invoice"
 								required
 							/>
-							{#if form.errors.singular_name}
+							{#if form.errors?.singular_name}
 								<p class="text-sm text-destructive">{form.errors.singular_name}</p>
 							{/if}
 							<p class="text-xs text-muted-foreground">
@@ -197,10 +189,10 @@
 										{@const IconComp = iconOption.component}
 										<button
 											type="button"
-											onclick={() => (form.data.icon = iconOption.name)}
+											onclick={() => ($form.icon = iconOption.name)}
 											class="h-10 w-10 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center transition-colors"
-											class:bg-accent={form.data.icon === iconOption.name}
-											class:text-accent-foreground={form.data.icon === iconOption.name}
+											class:bg-accent={$form.icon === iconOption.name}
+											class:text-accent-foreground={$form.icon === iconOption.name}
 											title={iconOption.name}
 										>
 											<IconComp class="h-5 w-5" />
@@ -219,7 +211,7 @@
 							<Label for="description">Description</Label>
 							<Textarea
 								id="description"
-								bind:value={form.data.description}
+								bind:value={$form.description}
 								placeholder="What is this module used for?"
 								rows={3}
 							/>
@@ -236,7 +228,7 @@
 									Inactive modules are hidden from users
 								</p>
 							</div>
-							<Switch id="is_active" bind:checked={form.data.is_active} />
+							<Switch id="is_active" bind:checked={$form.is_active} />
 						</div>
 					</CardContent>
 				</Card>

@@ -39,7 +39,9 @@ final class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+        $quoteParts = str(Inspiring::quotes()->random())->explode('-');
+        $message = mb_trim($quoteParts[0] ?? '');
+        $author = mb_trim($quoteParts[1] ?? 'Unknown');
 
         // Get modules for navigation (only if user is authenticated and tenant is initialized)
         $modules = [];
@@ -60,7 +62,7 @@ final class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'quote' => ['message' => mb_trim($message), 'author' => mb_trim($author)],
+            'quote' => ['message' => $message, 'author' => $author],
             'auth' => [
                 'user' => $request->user(),
             ],

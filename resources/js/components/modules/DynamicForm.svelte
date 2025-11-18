@@ -11,7 +11,12 @@
 		CurrencyField,
 		PercentField,
 		CheckboxField,
-		LookupField
+		LookupField,
+		RadioField,
+		SwitchField,
+		MultiselectField,
+		FileField,
+		ImageField
 	} from '@/components/form';
 	import type { Module, ModuleRecord } from '@/types/modules';
 	import { Loader2 } from 'lucide-svelte';
@@ -104,9 +109,35 @@
 						{#each block.fields as field (field.id)}
 							{@const fieldType = getFieldType(field.type)}
 
-							<div class:md:col-span-2={field.type === 'textarea' || field.type === 'rich_text'}>
-								{#if field.type === 'select' || field.type === 'radio' || field.type === 'multiselect'}
+							<div class:md:col-span-2={field.type === 'textarea' || field.type === 'rich_text' || field.type === 'file' || field.type === 'image'}>
+								{#if field.type === 'select'}
 									<SelectField
+										label={field.label}
+										name={field.api_name}
+										required={field.is_required}
+										description={field.help_text}
+										error={errors[field.api_name]}
+										options={field.options?.map(opt => ({
+											label: opt.label,
+											value: opt.value,
+										})) || []}
+										bind:value={formData[field.api_name]}
+									/>
+								{:else if field.type === 'radio'}
+									<RadioField
+										label={field.label}
+										name={field.api_name}
+										required={field.is_required}
+										description={field.help_text}
+										error={errors[field.api_name]}
+										options={field.options?.map(opt => ({
+											label: opt.label,
+											value: opt.value,
+										})) || []}
+										bind:value={formData[field.api_name]}
+									/>
+								{:else if field.type === 'multiselect'}
+									<MultiselectField
 										label={field.label}
 										name={field.api_name}
 										required={field.is_required}
@@ -120,6 +151,15 @@
 									/>
 								{:else if field.type === 'checkbox'}
 									<CheckboxField
+										label={field.label}
+										name={field.api_name}
+										required={field.is_required}
+										description={field.help_text}
+										error={errors[field.api_name]}
+										bind:value={formData[field.api_name]}
+									/>
+								{:else if field.type === 'toggle'}
+									<SwitchField
 										label={field.label}
 										name={field.api_name}
 										required={field.is_required}
@@ -182,6 +222,24 @@
 										description={field.help_text}
 										error={errors[field.api_name]}
 										relationshipId={field.relationship_id}
+										bind:value={formData[field.api_name]}
+									/>
+								{:else if field.type === 'file'}
+									<FileField
+										label={field.label}
+										name={field.api_name}
+										required={field.is_required}
+										description={field.help_text}
+										error={errors[field.api_name]}
+										bind:value={formData[field.api_name]}
+									/>
+								{:else if field.type === 'image'}
+									<ImageField
+										label={field.label}
+										name={field.api_name}
+										required={field.is_required}
+										description={field.help_text}
+										error={errors[field.api_name]}
 										bind:value={formData[field.api_name]}
 									/>
 								{:else if field.type === 'textarea' || field.type === 'rich_text'}

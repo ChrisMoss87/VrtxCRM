@@ -129,9 +129,8 @@
 		<label class="text-xs font-medium">Custom Range</label>
 		<div class="grid gap-2">
 			<Popover.Root>
-				<Popover.Trigger asChild let:builder>
+				<Popover.Trigger >
 					<Button
-						builders={[builder]}
 						variant="outline"
 						class={cn('justify-start text-left font-normal', !fromDate && 'text-muted-foreground')}
 					>
@@ -145,9 +144,8 @@
 			</Popover.Root>
 
 			<Popover.Root>
-				<Popover.Trigger asChild let:builder>
+				<Popover.Trigger>
 					<Button
-						builders={[builder]}
 						variant="outline"
 						class={cn('justify-start text-left font-normal', !toDate && 'text-muted-foreground')}
 					>

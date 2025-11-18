@@ -171,10 +171,9 @@
 <FieldBase {label} {name} {description} {error} {required} {disabled} {width} class={className}>
 	{#snippet children(props)}
 		<Popover.Root bind:open onOpenChange={handleOpenChange}>
-			<Popover.Trigger asChild let:builder>
+			<Popover.Trigger >
 				<Button
 					{...props}
-					builders={[builder]}
 					variant="outline"
 					role="combobox"
 					aria-expanded={open}

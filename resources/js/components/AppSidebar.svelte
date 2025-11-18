@@ -17,21 +17,25 @@
         briefcase: Briefcase,
     };
 
-    // Get modules from shared Inertia data
-    const modules = $page.props.modules as Array<{id: number, name: string, api_name: string, icon: string}> || [];
+    // Get modules from shared Inertia data - use $derived for reactive access
+    let mainNavItems = $derived.by(() => {
+        const modules = ($page.props.modules as Array<{id: number, name: string, api_name: string, icon: string}> | undefined) || [];
 
-    const mainNavItems: NavItem[] = [
-        {
-            title: 'Dashboard',
-            href: '/',
-            icon: LayoutGrid,
-        },
-        ...modules.map(module => ({
-            title: module.name,
-            href: `/modules/${module.api_name}`,
-            icon: moduleIconMap[module.icon] || Folder,
-        })),
-    ];
+        return [
+            {
+                title: 'Dashboard',
+                href: '/',
+                icon: LayoutGrid,
+            },
+            ...(Array.isArray(modules) ? modules : [])
+                .filter(module => module && module.name && module.api_name)
+                .map(module => ({
+                    title: module.name,
+                    href: `/modules/${module.api_name}`,
+                    icon: moduleIconMap[module.icon] || Folder,
+                })),
+        ];
+    });
 
     const adminNavItems: NavItem[] = [
         {

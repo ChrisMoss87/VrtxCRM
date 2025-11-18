@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\ModuleRecordsExport;
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Persistence\Eloquent\Models\ModuleModel;
 use App\Services\RecordService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 final class ModuleRecordController extends Controller
 {
@@ -30,8 +33,26 @@ final class ModuleRecordController extends Controller
         // Get valid field names for validation
         $validFields = $module->blocks->flatMap->fields->pluck('api_name')->toArray();
 
+        // Get searchable fields
+        $searchableFields = $module->blocks->flatMap->fields
+            ->filter(fn ($field) => $field->is_searchable)
+            ->pluck('api_name')
+            ->toArray();
+
         // Transform filters from frontend format to repository format
         $filters = [];
+
+        // Handle global search
+        if ($searchQuery = $request->query('search')) {
+            // Add search condition for all searchable fields
+            if (! empty($searchableFields)) {
+                $filters['_global_search'] = [
+                    'operator' => 'search',
+                    'value' => $searchQuery,
+                    'fields' => $searchableFields,
+                ];
+            }
+        }
         if ($filterData = $request->query('filters')) {
             if (is_string($filterData)) {
                 $filterData = json_decode($filterData, true);
@@ -296,5 +317,125 @@ final class ModuleRecordController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Export records to CSV or Excel.
+     */
+    public function export(Request $request, string $moduleApiName): BinaryFileResponse
+    {
+        $module = ModuleModel::where('api_name', $moduleApiName)->firstOrFail();
+
+        $format = $request->query('format', 'xlsx'); // xlsx or csv
+        $columns = $request->query('columns'); // Optional column selection
+
+        // Parse columns if provided
+        $selectedColumns = null;
+        if ($columns) {
+            $selectedColumns = is_string($columns) ? explode(',', $columns) : $columns;
+        }
+
+        // Get filters and sort from request (same as index method)
+        $filters = [];
+        $sort = [];
+
+        // Handle global search
+        if ($searchQuery = $request->query('search')) {
+            $searchableFields = $module->blocks->flatMap->fields
+                ->filter(fn ($field) => $field->is_searchable)
+                ->pluck('api_name')
+                ->toArray();
+
+            if (! empty($searchableFields)) {
+                $filters['_global_search'] = [
+                    'operator' => 'search',
+                    'value' => $searchQuery,
+                    'fields' => $searchableFields,
+                ];
+            }
+        }
+
+        // Parse filters
+        if ($filterData = $request->query('filters')) {
+            if (is_string($filterData)) {
+                $filterData = json_decode($filterData, true);
+            }
+
+            if (is_array($filterData)) {
+                $validFields = $module->blocks->flatMap->fields->pluck('api_name')->toArray();
+
+                foreach ($filterData as $filter) {
+                    if (! isset($filter['field'], $filter['operator'], $filter['value'])) {
+                        continue;
+                    }
+
+                    $field = $filter['field'];
+                    if (! in_array($field, $validFields, true)) {
+                        continue;
+                    }
+
+                    $operatorMap = [
+                        'gt' => 'greater_than',
+                        'gte' => 'greater_than_or_equal',
+                        'lt' => 'less_than',
+                        'lte' => 'less_than_or_equal',
+                    ];
+
+                    $filters[$field] = [
+                        'operator' => $operatorMap[$filter['operator']] ?? $filter['operator'],
+                        'value' => $filter['value'],
+                    ];
+                }
+            }
+        }
+
+        // Parse sort
+        if ($sortData = $request->query('sort')) {
+            if (is_string($sortData)) {
+                $sortData = json_decode($sortData, true);
+            }
+
+            if (is_array($sortData)) {
+                $validFields = $module->blocks->flatMap->fields->pluck('api_name')->toArray();
+
+                foreach ($sortData as $sortConfig) {
+                    if (! isset($sortConfig['field'], $sortConfig['direction'])) {
+                        continue;
+                    }
+
+                    $field = $sortConfig['field'];
+                    $direction = mb_strtolower($sortConfig['direction']);
+
+                    if (in_array($field, [...$validFields, 'id', 'created_at', 'updated_at'], true) &&
+                        in_array($direction, ['asc', 'desc'], true)) {
+                        $sort[$field] = $direction;
+                    }
+                }
+            }
+        }
+
+        // Default sort
+        if (empty($sort)) {
+            $sort = ['created_at' => 'desc'];
+        }
+
+        // Create export
+        $export = new ModuleRecordsExport(
+            $this->recordService,
+            $module->id,
+            $filters,
+            $sort,
+            $selectedColumns
+        );
+
+        // Generate filename
+        $filename = $module->api_name.'_'.now()->format('Y-m-d_His');
+
+        // Download based on format
+        if ($format === 'csv') {
+            return Excel::download($export, $filename.'.csv', \Maatwebsite\Excel\Excel::CSV);
+        }
+
+        return Excel::download($export, $filename.'.xlsx', \Maatwebsite\Excel\Excel::XLSX);
     }
 }

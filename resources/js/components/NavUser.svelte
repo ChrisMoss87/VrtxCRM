@@ -6,7 +6,7 @@
     import { page } from '@inertiajs/svelte';
     import { ChevronsUpDown } from 'lucide-svelte';
 
-    const user = $derived($page.props.auth.user);
+    const user = $derived($page.props.auth?.user);
 </script>
 
 <SidebarMenu>

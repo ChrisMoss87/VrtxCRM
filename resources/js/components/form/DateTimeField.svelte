@@ -122,10 +122,9 @@
 <FieldBase {label} {name} {description} {error} {required} {disabled} {width} class={className}>
 	{#snippet children(props)}
 		<Popover.Root>
-			<Popover.Trigger asChild let:builder>
+			<Popover.Trigger >
 				<Button
 					{...props}
-					builders={[builder]}
 					variant="outline"
 					class={cn(
 						'w-full justify-start text-left font-normal',

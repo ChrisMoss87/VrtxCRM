@@ -66,7 +66,7 @@ final class SampleContactsSeeder extends Seeder
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => mb_strtolower($firstName.'.'.$lastName.'.'.$index.'@example.com'),
-            'phone' => '+1 (555) '.str_pad((string) (100 + $index), 3, '0', STR_PAD_LEFT).'-'.str_pad((string) (1000 + $index), 4, '0', STR_PAD_LEFT),
+            'phone' => '+1 (555) '.mb_str_pad((string) (100 + $index), 3, '0', STR_PAD_LEFT).'-'.mb_str_pad((string) (1000 + $index), 4, '0', STR_PAD_LEFT),
             'job_title' => $jobTitles[$index % count($jobTitles)],
             'linkedin_url' => 'https://linkedin.com/in/'.mb_strtolower($firstName.$lastName.$index),
         ];
@@ -108,7 +108,7 @@ final class SampleContactsSeeder extends Seeder
         $data['street'] = ($index * 100).' '.['Main St', 'Oak Ave', 'Elm St', 'Pine Rd', 'Maple Dr'][$index % 5];
         $data['city'] = $cities[$cityIndex];
         $data['state'] = $states[$cityIndex];
-        $data['postal_code'] = str_pad((string) (10000 + $index), 5, '0', STR_PAD_LEFT);
+        $data['postal_code'] = mb_str_pad((string) (10000 + $index), 5, '0', STR_PAD_LEFT);
         $data['country'] = 'United States';
 
         // Text fields

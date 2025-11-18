@@ -115,6 +115,20 @@ final class EloquentModuleRecordRepository implements ModuleRecordRepositoryInte
             $operator = $filterConfig['operator'] ?? 'equals';
             $value = $filterConfig['value'] ?? null;
 
+            // Handle global search across multiple fields
+            if ($operator === 'search' && isset($filterConfig['fields'])) {
+                $searchFields = $filterConfig['fields'];
+                $searchValue = mb_strtolower($value);
+
+                $query->where(function ($q) use ($searchFields, $searchValue) {
+                    foreach ($searchFields as $field) {
+                        $q->orWhereRaw('LOWER(data->>?) LIKE ?', [$field, "%{$searchValue}%"]);
+                    }
+                });
+
+                continue;
+            }
+
             if ($value === null && $operator !== 'is_null' && $operator !== 'is_not_null') {
                 continue;
             }
